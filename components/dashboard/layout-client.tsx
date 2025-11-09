@@ -15,6 +15,7 @@ import {
   Sparkles,
   ChevronDown,
   Users,
+  BarChart3,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -29,6 +30,7 @@ const navigation = [
   { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
   { name: "Agents", href: "/agents", icon: Bot },
   { name: "Leads", href: "/leads", icon: Users },
+  { name: "Analytics", href: "/analytics", icon: BarChart3 },
   { name: "Conversations", href: "/conversations", icon: MessageSquare },
   { name: "Integrations", href: "/integrations", icon: Plug },
   { name: "Settings", href: "/settings", icon: Settings },

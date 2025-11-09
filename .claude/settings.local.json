@@ -7,7 +7,7 @@
       "Bash(npx shadcn@latest init:*)",
       "Bash(npx shadcn@latest add:*)"
     ],
-    "deny": [],
+    "deny": ["Bash(npm run dev)"],
     "ask": []
   }
 }
