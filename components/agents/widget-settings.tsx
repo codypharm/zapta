@@ -24,9 +24,11 @@ export function WidgetSettings({ agent }: WidgetSettingsProps) {
   const [primaryColor, setPrimaryColor] = useState("#FF7A59");
   const [position, setPosition] = useState("bottom-right");
 
-  // Get the current domain (in production this would be the actual domain)
+  // Get the API URL based on environment
   const apiUrl = typeof window !== "undefined"
     ? window.location.origin
+    : process.env.NODE_ENV === "production"
+    ? "https://zapta-nu.vercel.app"
     : "http://localhost:3000";
 
   // Generate embed code

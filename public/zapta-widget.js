@@ -6,10 +6,17 @@
 (function () {
   "use strict";
 
+  // Auto-detect API URL based on where the script is loaded from
+  const scriptElement = document.currentScript;
+  const scriptSrc = scriptElement ? scriptElement.src : "";
+  const defaultApiUrl = scriptSrc.includes("localhost")
+    ? "http://localhost:3000"
+    : "https://zapta-nu.vercel.app";
+
   // Widget configuration
   const config = {
     agentId: window.ZAPTA_AGENT_ID || "",
-    apiUrl: window.ZAPTA_API_URL || "http://localhost:3000",
+    apiUrl: window.ZAPTA_API_URL || defaultApiUrl,
     primaryColor: window.ZAPTA_PRIMARY_COLOR || "#FF7A59",
     position: window.ZAPTA_POSITION || "bottom-right",
   };
