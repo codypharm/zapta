@@ -37,22 +37,8 @@ export default async function DashboardPage({
   const params = await searchParams;
 
   return (
-    <div className="flex min-h-screen flex-col">
-      {/* Header */}
-      <header className="border-b bg-background">
-        <div className="flex h-16 items-center px-8">
-          <h1 className="text-xl font-bold">Zapta</h1>
-          <div className="ml-auto flex items-center gap-4">
-            <span className="text-sm text-muted-foreground">
-              {profile?.full_name || user.email}
-            </span>
-          </div>
-        </div>
-      </header>
-
-      {/* Main content */}
-      <main className="flex-1 p-8">
-        <div className="mx-auto max-w-7xl space-y-8">
+    <div className="p-8">
+      <div className="mx-auto max-w-7xl space-y-8">
           {/* Email verification success message */}
           {params.verified === "true" && (
             <Alert className="border-green-200 bg-green-50 text-green-800">
@@ -146,7 +132,6 @@ export default async function DashboardPage({
             </CardContent>
           </Card>
         </div>
-      </main>
     </div>
   );
 }
