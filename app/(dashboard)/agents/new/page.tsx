@@ -21,7 +21,7 @@ import {
 } from "@/components/ui/select";
 import { ArrowLeft, ArrowRight, Check } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { LeadCollectionSettings } from "@/components/agents/lead-collection-settings";
+import { LeadCollectionSettings, type LeadCollectionConfig } from "@/components/agents/lead-collection-settings";
 
 const AGENT_TYPES = [
   { value: "support", label: "Customer Support", description: "Handle customer inquiries and provide assistance" },
@@ -52,7 +52,15 @@ export default function CreateAgentPage() {
   const [error, setError] = useState<string | null>(null);
 
   // Form data
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<{
+    name: string;
+    type: string;
+    description: string;
+    instructions: string;
+    model: string;
+    tone: string;
+    leadCollection: LeadCollectionConfig;
+  }>({
     name: "",
     type: "",
     description: "",

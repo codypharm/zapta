@@ -11,16 +11,16 @@ interface FieldConfig {
   required: boolean;
 }
 
-interface LeadCollectionConfig {
+export interface LeadCollectionConfig {
   enabled: boolean;
   fields: {
-    name?: FieldConfig;
-    email?: FieldConfig;
-    phone?: FieldConfig;
-    company?: FieldConfig;
+    name: FieldConfig;
+    email: FieldConfig;
+    phone: FieldConfig;
+    company: FieldConfig;
   };
-  welcomeMessage?: string;
-  submitButtonText?: string;
+  welcomeMessage: string;
+  submitButtonText: string;
 }
 
 interface LeadCollectionSettingsProps {

@@ -47,9 +47,9 @@ export function AgentChat({ agentId, agentStatus }: AgentChatProps) {
         setError(response.error);
         // Remove the user message if there was an error
         setMessages((prev) => prev.slice(0, -1));
-      } else {
+      } else if (response.message) {
         // Add assistant response
-        setMessages((prev) => [...prev, { role: "assistant", content: response.message }]);
+        setMessages((prev) => [...prev, { role: "assistant", content: response.message! }]);
       }
     } catch (err) {
       setError("Failed to send message");

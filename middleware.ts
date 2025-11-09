@@ -1,13 +1,15 @@
 /**
  * Next.js Middleware
- * Runs on every request to handle auth and session management
+ * Runs on Edge Runtime for optimal performance
+ * Auth is handled in Server Components (layouts/pages) instead
  */
 
-import { type NextRequest } from 'next/server';
-import { updateSession } from '@/lib/supabase/middleware';
+import { type NextRequest, NextResponse } from 'next/server';
 
 export async function middleware(request: NextRequest) {
-  return await updateSession(request);
+  // Middleware runs on Edge for maximum performance
+  // Auth checking is handled in Server Components where Supabase is fully supported
+  return NextResponse.next();
 }
 
 export const config = {

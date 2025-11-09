@@ -844,6 +844,242 @@ export async function checkQuota(
 
 ---
 
+## Phase 9.5: Notification System (Week 9-10)
+
+### Email & In-App Notifications
+**Goal:** Keep users informed of important events and activity
+
+**Current Status:**
+- ✅ Notification preferences UI (Settings page)
+- ✅ Database column for preferences (`profiles.notification_preferences`)
+- ❌ Email sending infrastructure (needs implementation)
+- ❌ In-app notification system (needs implementation)
+- ❌ Notification triggers (needs implementation)
+
+**Email Notifications (Priority):**
+```typescript
+// lib/notifications/email.ts
+/**
+ * Email notification system using Resend
+ * Sends notifications based on user preferences
+ */
+export async function sendEmailNotification(params: {
+  to: string;
+  type: 'new_lead' | 'new_conversation' | 'daily_summary' | 'weekly_summary';
+  data: any;
+  tenantId: string;
+}): Promise<void> {
+  // 1. Check user's notification preferences
+  const preferences = await getNotificationPreferences(params.to);
+
+  // 2. Check if this notification type is enabled
+  const typeMap = {
+    new_lead: preferences.email.newLeads,
+    new_conversation: preferences.email.newConversations,
+    daily_summary: preferences.email.dailySummary,
+    weekly_summary: preferences.email.weeklySummary,
+  };
+
+  if (!typeMap[params.type]) {
+    return; // User has disabled this notification
+  }
+
+  // 3. Get email template
+  const template = getEmailTemplate(params.type, params.data);
+
+  // 4. Send via Resend
+  await resend.emails.send({
+    from: 'notifications@zapta.ai',
+    to: params.to,
+    subject: template.subject,
+    react: template.component, // React Email component
+  });
+}
+```
+
+**Email Templates (React Email):**
+```typescript
+// emails/new-lead.tsx
+/**
+ * Email template for new lead notifications
+ * Uses React Email for consistent, beautiful emails
+ */
+export function NewLeadEmail({ lead, agent }: {
+  lead: Lead;
+  agent: Agent;
+}) {
+  return (
+    <Html>
+      <Head />
+      <Body style={main}>
+        <Container style={container}>
+          <Heading style={h1}>New Lead Captured! 🎉</Heading>
+
+          <Text style={text}>
+            Your agent <strong>{agent.name}</strong> just captured a new lead:
+          </Text>
+
+          <Section style={leadInfo}>
+            {lead.name && <Text><strong>Name:</strong> {lead.name}</Text>}
+            {lead.email && <Text><strong>Email:</strong> {lead.email}</Text>}
+            {lead.phone && <Text><strong>Phone:</strong> {lead.phone}</Text>}
+            {lead.company && <Text><strong>Company:</strong> {lead.company}</Text>}
+          </Section>
+
+          <Button style={button} href={`https://app.zapta.ai/leads/${lead.id}`}>
+            View Lead Details
+          </Button>
+
+          <Hr style={hr} />
+
+          <Text style={footer}>
+            You're receiving this because you have new lead notifications enabled.
+            <Link href="https://app.zapta.ai/settings">Manage preferences</Link>
+          </Text>
+        </Container>
+      </Body>
+    </Html>
+  );
+}
+```
+
+**Notification Triggers:**
+```typescript
+// lib/leads/actions.ts (updated)
+/**
+ * Create a new lead - UPDATED with notification trigger
+ */
+export async function createLead(data: CreateLeadData) {
+  // ... existing lead creation code ...
+
+  // NEW: Trigger email notification
+  await sendEmailNotification({
+    to: tenant.owner_email, // Or all users with newLeads enabled
+    type: 'new_lead',
+    data: { lead, agent },
+    tenantId: profile.tenant_id,
+  });
+
+  return { success: true, lead };
+}
+```
+
+**Scheduled Summaries (Trigger.dev):**
+```typescript
+// trigger/email-summaries.ts
+/**
+ * Daily and weekly email summary jobs
+ * Sends activity digests to users based on preferences
+ */
+export const dailySummary = schedules.task({
+  id: "daily-email-summary",
+  cron: "0 9 * * *", // 9 AM daily
+  run: async () => {
+    // Find all users with daily summary enabled
+    const users = await getUsersWithPreference('email.dailySummary', true);
+
+    for (const user of users) {
+      // Get yesterday's activity
+      const activity = await getTenantActivity(user.tenant_id, 'yesterday');
+
+      // Send summary email
+      await sendEmailNotification({
+        to: user.email,
+        type: 'daily_summary',
+        data: activity,
+        tenantId: user.tenant_id,
+      });
+    }
+  },
+});
+
+export const weeklySummary = schedules.task({
+  id: "weekly-email-summary",
+  cron: "0 9 * * 1", // 9 AM every Monday
+  run: async () => {
+    // Similar to daily, but for weekly summaries
+    // ...
+  },
+});
+```
+
+**In-App Notifications (Advanced - Optional):**
+```typescript
+// Database table for in-app notifications
+CREATE TABLE notifications (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  tenant_id UUID REFERENCES tenants(id),
+  user_id UUID REFERENCES profiles(id),
+  type TEXT NOT NULL, -- 'lead', 'conversation', 'system'
+  title TEXT NOT NULL,
+  message TEXT,
+  link TEXT, -- URL to navigate to
+  read BOOLEAN DEFAULT FALSE,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+// Component for notification dropdown
+// components/dashboard/notifications-dropdown.tsx
+export function NotificationsDropdown() {
+  const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [unreadCount, setUnreadCount] = useState(0);
+
+  // Subscribe to real-time notifications using Supabase Realtime
+  useEffect(() => {
+    const channel = supabase
+      .channel('notifications')
+      .on('postgres_changes', {
+        event: 'INSERT',
+        schema: 'public',
+        table: 'notifications',
+        filter: `user_id=eq.${userId}`,
+      }, (payload) => {
+        setNotifications(prev => [payload.new, ...prev]);
+        setUnreadCount(count => count + 1);
+      })
+      .subscribe();
+
+    return () => { supabase.removeChannel(channel); };
+  }, []);
+
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button variant="ghost" size="icon" className="relative">
+          <Bell className="h-5 w-5" />
+          {unreadCount > 0 && (
+            <span className="absolute top-0 right-0 h-4 w-4 bg-red-500 text-white text-xs rounded-full flex items-center justify-center">
+              {unreadCount}
+            </span>
+          )}
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="w-80">
+        {/* Notification list */}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
+```
+
+**Implementation Order:**
+1. **Email infrastructure setup** (Resend account, React Email)
+2. **Create email templates** (new lead, new conversation)
+3. **Add notification triggers** to existing actions
+4. **Test email delivery**
+5. **Implement scheduled summaries** (daily/weekly)
+6. **(Optional) In-app notifications** if needed
+
+**Deliverables:**
+- [ ] Resend integration configured
+- [ ] React Email templates for all notification types
+- [ ] Notification triggers in lead/conversation creation
+- [ ] Daily/weekly summary jobs with Trigger.dev
+- [ ] (Optional) In-app notification system with Supabase Realtime
+- [ ] Notification testing & monitoring
+
+---
+
 ## Phase 10: Knowledge Base & RAG (Week 10)
 
 ### Document Upload & Semantic Search

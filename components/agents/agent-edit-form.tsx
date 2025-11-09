@@ -17,7 +17,7 @@ import {
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { ArrowLeft, Save } from "lucide-react";
 import Link from "next/link";
-import { LeadCollectionSettings } from "@/components/agents/lead-collection-settings";
+import { LeadCollectionSettings, type LeadCollectionConfig } from "@/components/agents/lead-collection-settings";
 
 const AGENT_TYPES = [
   { value: "support", label: "Customer Support" },
@@ -63,7 +63,15 @@ export function AgentEditForm({ agent }: AgentEditFormProps) {
   const [error, setError] = useState<string | null>(null);
 
   // Form data initialized with agent values
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<{
+    name: string;
+    type: string;
+    description: string;
+    instructions: string;
+    model: string;
+    tone: string;
+    leadCollection: LeadCollectionConfig;
+  }>({
     name: agent.name,
     type: agent.type,
     description: agent.description,
