@@ -9,6 +9,7 @@ import { generateText } from "ai";
 import { createGoogleGenerativeAI } from "@ai-sdk/google";
 import { createAnthropic } from "@ai-sdk/anthropic";
 import { createOpenAI } from "@ai-sdk/openai";
+import { notifyTenantUsers } from "@/lib/notifications/email";
 
 // Create Supabase client with service role (bypass RLS for public endpoint)
 const supabase = createClient(
@@ -225,7 +226,7 @@ async function saveConversation(
           messages,
           metadata: { sessionId },
         })
-        .select("id")
+        .select("id, created_at")
         .single();
 
       // If leadId is provided, link the lead to this conversation
@@ -234,6 +235,30 @@ async function saveConversation(
           .from("leads")
           .update({ conversation_id: newConversation.id })
           .eq("id", leadId);
+      }
+
+      // Send notification for new conversation (non-blocking)
+      if (newConversation) {
+        // Get agent name for notification
+        const { data: agentData } = await supabase
+          .from("agents")
+          .select("name, type, description")
+          .eq("id", agentId)
+          .single();
+
+        if (agentData) {
+          notifyTenantUsers(tenantId, "new_conversation", {
+            conversation: {
+              id: newConversation.id,
+              messages,
+              created_at: newConversation.created_at,
+            },
+            agent: agentData,
+          }).catch((error) => {
+            console.error("Failed to send conversation notification:", error);
+            // Don't fail the request if notification fails
+          });
+        }
       }
     }
   } catch (error) {

@@ -5,6 +5,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
+import { notifyTenantUsers } from "@/lib/notifications/email";
 
 // Create Supabase client with service role (bypass RLS for public endpoint)
 const supabase = createClient(
@@ -158,6 +159,19 @@ export async function POST(
       }
 
       lead = newLead;
+
+      // Send notification to tenant users (non-blocking)
+      // Only notify for NEW leads, not updates
+      notifyTenantUsers(agent.tenant_id, "new_lead", {
+        lead: newLead,
+        agent: {
+          name: agent.name,
+          type: agent.type,
+        },
+      }).catch((error) => {
+        console.error("Failed to send lead notification:", error);
+        // Don't fail the request if notification fails
+      });
     }
 
     // Return success with lead ID
