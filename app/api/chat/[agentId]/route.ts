@@ -69,6 +69,7 @@ export async function POST(
 
     // Build system prompt
     const systemPrompt = buildSystemPrompt(
+      agent.name,
       agent.config.instructions,
       agent.config.tone
     );
@@ -116,7 +117,7 @@ export async function POST(
 /**
  * Build system prompt based on agent configuration
  */
-function buildSystemPrompt(instructions: string, tone: string): string {
+function buildSystemPrompt(name: string, instructions: string, tone: string): string {
   const toneInstructions = {
     professional:
       "Maintain a professional and courteous tone in all responses.",
@@ -128,7 +129,9 @@ function buildSystemPrompt(instructions: string, tone: string): string {
       "Use formal language and maintain a serious, respectful tone throughout.",
   };
 
-  return `${instructions}
+  return `You are ${name}, an AI assistant.
+
+${instructions}
 
 ${toneInstructions[tone as keyof typeof toneInstructions] || toneInstructions.professional}
 

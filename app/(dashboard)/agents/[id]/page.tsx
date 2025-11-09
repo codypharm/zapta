@@ -7,7 +7,7 @@ import { createServerClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, Edit, Code2 } from "lucide-react";
 import Link from "next/link";
 import { AgentChat } from "@/components/agents/agent-chat";
 
@@ -76,6 +76,20 @@ export default async function AgentDetailPage({ params }: { params: Promise<{ id
                   {agent.status}
                 </span>
               </div>
+            </div>
+            <div className="flex gap-2">
+              <Button asChild variant="outline" size="sm">
+                <Link href={`/agents/${agent.id}/widget`}>
+                  <Code2 className="w-4 h-4 mr-2" />
+                  Widget
+                </Link>
+              </Button>
+              <Button asChild variant="outline" size="sm">
+                <Link href={`/agents/${agent.id}/edit`}>
+                  <Edit className="w-4 h-4 mr-2" />
+                  Edit
+                </Link>
+              </Button>
             </div>
           </div>
         </div>
