@@ -19,6 +19,7 @@ import {
   LogOut,
   Sparkles,
   ChevronDown,
+  Users,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -32,8 +33,9 @@ import {
 const navigation = [
   { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
   { name: "Agents", href: "/agents", icon: Bot },
-  { name: "Integrations", href: "/integrations", icon: Plug },
+  { name: "Leads", href: "/leads", icon: Users },
   { name: "Conversations", href: "/conversations", icon: MessageSquare },
+  { name: "Integrations", href: "/integrations", icon: Plug },
   { name: "Settings", href: "/settings", icon: Settings },
 ];
 

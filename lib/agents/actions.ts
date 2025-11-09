@@ -15,6 +15,17 @@ interface CreateAgentData {
   instructions: string;
   model: string;
   tone: string;
+  leadCollection?: {
+    enabled: boolean;
+    fields: {
+      name?: { enabled: boolean; required: boolean };
+      email?: { enabled: boolean; required: boolean };
+      phone?: { enabled: boolean; required: boolean };
+      company?: { enabled: boolean; required: boolean };
+    };
+    welcomeMessage?: string;
+    submitButtonText?: string;
+  };
 }
 
 /**
@@ -58,11 +69,16 @@ export async function createAgent(data: CreateAgentData) {
 
   try {
     // Create agent configuration
-    const config = {
+    const config: any = {
       model: data.model,
       tone: data.tone,
       instructions: data.instructions,
     };
+
+    // Add lead collection settings if provided
+    if (data.leadCollection) {
+      config.leadCollection = data.leadCollection;
+    }
 
     // Insert agent
     const { data: agent, error } = await supabase
@@ -118,7 +134,7 @@ export async function updateAgent(id: string, data: Partial<CreateAgentData>) {
     if (data.type) updateData.type = data.type;
     if (data.description) updateData.description = data.description;
 
-    if (data.instructions || data.model || data.tone) {
+    if (data.instructions || data.model || data.tone || data.leadCollection) {
       // Get current configuration
       const { data: currentAgent } = await supabase
         .from("agents")
@@ -131,6 +147,7 @@ export async function updateAgent(id: string, data: Partial<CreateAgentData>) {
         ...(data.model && { model: data.model }),
         ...(data.tone && { tone: data.tone }),
         ...(data.instructions && { instructions: data.instructions }),
+        ...(data.leadCollection && { leadCollection: data.leadCollection }),
       };
     }
 

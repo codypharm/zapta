@@ -17,6 +17,7 @@ import {
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { ArrowLeft, Save } from "lucide-react";
 import Link from "next/link";
+import { LeadCollectionSettings } from "@/components/agents/lead-collection-settings";
 
 const AGENT_TYPES = [
   { value: "support", label: "Customer Support" },
@@ -51,6 +52,7 @@ interface AgentEditFormProps {
       model: string;
       tone: string;
       instructions: string;
+      leadCollection?: any;
     };
   };
 }
@@ -68,6 +70,17 @@ export function AgentEditForm({ agent }: AgentEditFormProps) {
     instructions: agent.config?.instructions || "",
     model: agent.config?.model || "gemini-2.5-flash",
     tone: agent.config?.tone || "professional",
+    leadCollection: agent.config?.leadCollection || {
+      enabled: false,
+      fields: {
+        name: { enabled: false, required: false },
+        email: { enabled: false, required: false },
+        phone: { enabled: false, required: false },
+        company: { enabled: false, required: false },
+      },
+      welcomeMessage: "Let us know how to reach you",
+      submitButtonText: "Start Chat",
+    },
   });
 
   const updateFormData = (field: string, value: string) => {
@@ -242,6 +255,12 @@ export function AgentEditForm({ agent }: AgentEditFormProps) {
                   </Select>
                 </div>
               </div>
+
+              {/* Lead Collection Settings */}
+              <LeadCollectionSettings
+                config={formData.leadCollection}
+                onChange={(config) => setFormData((prev) => ({ ...prev, leadCollection: config }))}
+              />
 
               {/* Submit Button */}
               <div className="flex gap-3 pt-4">

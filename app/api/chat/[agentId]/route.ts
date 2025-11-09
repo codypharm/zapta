@@ -28,7 +28,7 @@ export async function POST(
   try {
     const { agentId } = await params;
     const body = await request.json();
-    const { message, sessionId, history = [] } = body;
+    const { message, sessionId, history = [], leadId } = body;
 
     // Validate input
     if (!message?.trim()) {
@@ -98,7 +98,7 @@ export async function POST(
       ...history,
       { role: "user", content: message },
       { role: "assistant", content: text },
-    ]);
+    ], leadId);
 
     // Return response
     return NextResponse.json({
@@ -194,7 +194,8 @@ async function saveConversation(
   agentId: string,
   tenantId: string,
   sessionId: string,
-  messages: Message[]
+  messages: Message[],
+  leadId?: string
 ) {
   try {
     // Check if conversation exists for this session
@@ -216,12 +217,24 @@ async function saveConversation(
         .eq("id", existing.id);
     } else {
       // Create new conversation
-      await supabase.from("conversations").insert({
-        tenant_id: tenantId,
-        agent_id: agentId,
-        messages,
-        metadata: { sessionId },
-      });
+      const { data: newConversation } = await supabase
+        .from("conversations")
+        .insert({
+          tenant_id: tenantId,
+          agent_id: agentId,
+          messages,
+          metadata: { sessionId },
+        })
+        .select("id")
+        .single();
+
+      // If leadId is provided, link the lead to this conversation
+      if (leadId && newConversation) {
+        await supabase
+          .from("leads")
+          .update({ conversation_id: newConversation.id })
+          .eq("id", leadId);
+      }
     }
   } catch (error) {
     console.error("Failed to save conversation:", error);

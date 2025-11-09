@@ -32,5 +32,5 @@ export default async function ConversationDetailPage({
     redirect("/conversations");
   }
 
-  return <ConversationDetail conversation={result.conversation} />;
+  return <ConversationDetail conversation={result.conversation} lead={result.lead} />;
 }

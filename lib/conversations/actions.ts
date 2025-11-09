@@ -173,7 +173,18 @@ export async function getConversationById(conversationId: string) {
       return { error: "Conversation not found" };
     }
 
-    return { conversation: conversation as Conversation };
+    // Fetch associated lead if exists
+    const { data: lead } = await supabase
+      .from("leads")
+      .select("*")
+      .eq("conversation_id", conversationId)
+      .eq("tenant_id", profile.tenant_id)
+      .maybeSingle();
+
+    return {
+      conversation: conversation as Conversation,
+      lead: lead || undefined
+    };
   } catch (error) {
     console.error("Error fetching conversation:", error);
     return { error: "Failed to fetch conversation" };

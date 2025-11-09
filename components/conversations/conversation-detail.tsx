@@ -16,15 +16,17 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { ArrowLeft, Calendar, Bot, Trash2, Download, Sparkles } from "lucide-react";
+import { ArrowLeft, Calendar, Bot, Trash2, Download, Sparkles, User, Mail, Phone, Building } from "lucide-react";
 import { type Conversation } from "@/lib/conversations/actions";
+import { type Lead } from "@/lib/leads/actions";
 import { deleteConversation } from "@/lib/conversations/actions";
 
 interface ConversationDetailProps {
   conversation: Conversation;
+  lead?: Lead;
 }
 
-export function ConversationDetail({ conversation }: ConversationDetailProps) {
+export function ConversationDetail({ conversation, lead }: ConversationDetailProps) {
   const router = useRouter();
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -152,6 +154,78 @@ export function ConversationDetail({ conversation }: ConversationDetailProps) {
               </div>
             </CardContent>
           </Card>
+
+          {/* Lead Information */}
+          {lead && (
+            <Card>
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <CardTitle>Contact Information</CardTitle>
+                    <CardDescription>
+                      Lead collected before conversation
+                    </CardDescription>
+                  </div>
+                  <Button asChild variant="outline" size="sm">
+                    <Link href={`/leads/${lead.id}`}>
+                      View Full Profile
+                    </Link>
+                  </Button>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {lead.name && (
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
+                        <User className="w-5 h-5 text-primary" />
+                      </div>
+                      <div>
+                        <div className="text-xs text-muted-foreground">Name</div>
+                        <div className="font-medium">{lead.name}</div>
+                      </div>
+                    </div>
+                  )}
+
+                  {lead.email && (
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
+                        <Mail className="w-5 h-5 text-primary" />
+                      </div>
+                      <div>
+                        <div className="text-xs text-muted-foreground">Email</div>
+                        <div className="font-medium text-sm break-all">{lead.email}</div>
+                      </div>
+                    </div>
+                  )}
+
+                  {lead.phone && (
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
+                        <Phone className="w-5 h-5 text-primary" />
+                      </div>
+                      <div>
+                        <div className="text-xs text-muted-foreground">Phone</div>
+                        <div className="font-medium">{lead.phone}</div>
+                      </div>
+                    </div>
+                  )}
+
+                  {lead.company && (
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
+                        <Building className="w-5 h-5 text-primary" />
+                      </div>
+                      <div>
+                        <div className="text-xs text-muted-foreground">Company</div>
+                        <div className="font-medium">{lead.company}</div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          )}
 
           {/* Messages */}
           <Card>

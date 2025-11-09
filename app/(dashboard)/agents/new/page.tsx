@@ -21,6 +21,7 @@ import {
 } from "@/components/ui/select";
 import { ArrowLeft, ArrowRight, Check } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { LeadCollectionSettings } from "@/components/agents/lead-collection-settings";
 
 const AGENT_TYPES = [
   { value: "support", label: "Customer Support", description: "Handle customer inquiries and provide assistance" },
@@ -58,6 +59,17 @@ export default function CreateAgentPage() {
     instructions: "",
     model: "gemini-2.5-flash",
     tone: "professional",
+    leadCollection: {
+      enabled: false,
+      fields: {
+        name: { enabled: false, required: false },
+        email: { enabled: false, required: false },
+        phone: { enabled: false, required: false },
+        company: { enabled: false, required: false },
+      },
+      welcomeMessage: "Let us know how to reach you",
+      submitButtonText: "Start Chat",
+    },
   });
 
   const updateFormData = (field: string, value: string) => {
@@ -312,6 +324,12 @@ Example: You are a helpful customer support agent. Your goal is to assist custom
                   </Select>
                 </div>
               </div>
+
+              {/* Lead Collection Settings */}
+              <LeadCollectionSettings
+                config={formData.leadCollection}
+                onChange={(config) => setFormData((prev) => ({ ...prev, leadCollection: config }))}
+              />
             </CardContent>
           </Card>
         )}
@@ -359,6 +377,47 @@ Example: You are a helpful customer support agent. Your goal is to assist custom
                   <div className="whitespace-pre-wrap bg-muted p-4 rounded-lg text-sm">
                     {formData.instructions}
                   </div>
+                </div>
+
+                <div>
+                  <div className="text-sm font-medium text-muted-foreground mb-2">Lead Collection</div>
+                  {formData.leadCollection.enabled ? (
+                    <div className="bg-muted p-4 rounded-lg space-y-3">
+                      <div className="flex items-center gap-2">
+                        <div className="w-2 h-2 rounded-full bg-green-500"></div>
+                        <span className="text-sm font-medium">Enabled</span>
+                      </div>
+                      <div>
+                        <div className="text-xs text-muted-foreground mb-1">Collecting Fields:</div>
+                        <div className="flex flex-wrap gap-2">
+                          {Object.entries(formData.leadCollection.fields).map(([field, config]) =>
+                            config.enabled && (
+                              <span key={field} className="text-xs px-2 py-1 bg-primary/10 text-primary rounded capitalize">
+                                {field} {config.required && <span className="text-red-500">*</span>}
+                              </span>
+                            )
+                          )}
+                        </div>
+                      </div>
+                      {formData.leadCollection.welcomeMessage && (
+                        <div>
+                          <div className="text-xs text-muted-foreground">Welcome Message:</div>
+                          <div className="text-sm">{formData.leadCollection.welcomeMessage}</div>
+                        </div>
+                      )}
+                      {formData.leadCollection.submitButtonText && (
+                        <div>
+                          <div className="text-xs text-muted-foreground">Button Text:</div>
+                          <div className="text-sm">{formData.leadCollection.submitButtonText}</div>
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="bg-muted p-4 rounded-lg flex items-center gap-2">
+                      <div className="w-2 h-2 rounded-full bg-gray-400"></div>
+                      <span className="text-sm text-muted-foreground">Disabled</span>
+                    </div>
+                  )}
                 </div>
               </div>
             </CardContent>
