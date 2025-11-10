@@ -9,6 +9,8 @@ import { Resend } from "resend";
 import { createServerClient } from "@/lib/supabase/server";
 import { NewLeadEmail } from "@/emails/new-lead";
 import { NewConversationEmail } from "@/emails/new-conversation";
+import { DailySummaryEmail } from "@/emails/daily-summary";
+import { WeeklySummaryEmail } from "@/emails/weekly-summary";
 
 // Initialize Resend
 const resend = new Resend(process.env.RESEND_API_KEY);
@@ -149,12 +151,27 @@ function getEmailTemplate(type: NotificationType, data: any) {
       };
 
     case "daily_summary":
-      // TODO: Create daily summary email template
-      throw new Error("Daily summary email template not yet implemented");
+      return {
+        subject: `Your Daily Summary - ${data.date}`,
+        react: DailySummaryEmail({
+          userName: data.userName,
+          activity: data.activity,
+          date: data.date,
+          appUrl: process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000",
+        }),
+      };
 
     case "weekly_summary":
-      // TODO: Create weekly summary email template
-      throw new Error("Weekly summary email template not yet implemented");
+      return {
+        subject: `Your Weekly Summary - ${data.weekStart} to ${data.weekEnd}`,
+        react: WeeklySummaryEmail({
+          userName: data.userName,
+          activity: data.activity,
+          weekStart: data.weekStart,
+          weekEnd: data.weekEnd,
+          appUrl: process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000",
+        }),
+      };
 
     default:
       throw new Error(`Unknown notification type: ${type}`);
