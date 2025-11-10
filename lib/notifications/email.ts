@@ -12,8 +12,14 @@ import { NewConversationEmail } from "@/emails/new-conversation";
 import { DailySummaryEmail } from "@/emails/daily-summary";
 import { WeeklySummaryEmail } from "@/emails/weekly-summary";
 
-// Initialize Resend
-const resend = new Resend(process.env.RESEND_API_KEY);
+// Lazy initialize Resend to avoid build-time errors
+let resendInstance: Resend | null = null;
+function getResend() {
+  if (!resendInstance) {
+    resendInstance = new Resend(process.env.RESEND_API_KEY);
+  }
+  return resendInstance;
+}
 
 export type NotificationType =
   | "new_lead"
@@ -102,6 +108,7 @@ export async function sendEmailNotification(
     const { subject, react } = getEmailTemplate(params.type, params.data);
 
     // 4. Send via Resend
+    const resend = getResend();
     const { data, error } = await resend.emails.send({
       from: process.env.RESEND_FROM_EMAIL || "Zapta <notifications@zapta.ai>",
       to: params.to,
