@@ -6,7 +6,7 @@
 import { defineConfig } from "@trigger.dev/sdk/v3";
 
 export default defineConfig({
-  project: process.env.TRIGGER_PROJECT_ID || "proj_zapta",
+  project: process.env.TRIGGER_PROJECT_ID || "proj_fvxetetzovxqgnoydlit",
   // Maximum duration for tasks (in seconds)
   maxDuration: 300, // 5 minutes
   retries: {
