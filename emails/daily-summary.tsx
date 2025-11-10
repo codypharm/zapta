@@ -157,12 +157,15 @@ const sectionTitle = {
 
 const metricsContainer = {
   margin: "24px 20px",
+  boxSizing: "border-box" as const,
+  maxWidth: "calc(100% - 40px)",
 };
 
 const metricsTable = {
   width: "100%",
   borderCollapse: "separate" as const,
-  borderSpacing: "12px",
+  borderSpacing: "8px 12px",
+  boxSizing: "border-box" as const,
 };
 
 const metricCard = {
