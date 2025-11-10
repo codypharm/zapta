@@ -84,6 +84,7 @@ export const weeklySummaryTask = task({
                 weekEnd: formattedEnd,
               },
               tenantId: tenant.id,
+              useServiceClient: true, // Use service client for background jobs
             });
 
             if (result.success) {

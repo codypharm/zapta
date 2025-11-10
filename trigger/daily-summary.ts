@@ -78,6 +78,7 @@ export const dailySummaryTask = task({
                 date: formattedDate,
               },
               tenantId: tenant.id,
+              useServiceClient: true, // Use service client for background jobs
             });
 
             if (result.success) {

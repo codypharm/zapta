@@ -7,6 +7,7 @@
 
 import { Resend } from "resend";
 import { createServerClient } from "@/lib/supabase/server";
+import { createServiceClient } from "@/lib/supabase/service";
 import { NewLeadEmail } from "@/emails/new-lead";
 import { NewConversationEmail } from "@/emails/new-conversation";
 import { DailySummaryEmail } from "@/emails/daily-summary";
@@ -32,13 +33,19 @@ interface SendEmailNotificationParams {
   type: NotificationType;
   data: any;
   tenantId: string;
+  useServiceClient?: boolean; // Use service client for background jobs
 }
 
 /**
  * Get user's notification preferences from database
  */
-async function getNotificationPreferences(email: string) {
-  const supabase = await createServerClient();
+async function getNotificationPreferences(
+  email: string,
+  useServiceClient: boolean = false
+) {
+  const supabase = useServiceClient
+    ? createServiceClient()
+    : await createServerClient();
 
   const { data: profile } = await supabase
     .from("profiles")
@@ -62,8 +69,13 @@ async function getNotificationPreferences(email: string) {
 /**
  * Get all users for a tenant with their notification preferences
  */
-export async function getTenantUsersWithNotifications(tenantId: string) {
-  const supabase = await createServerClient();
+export async function getTenantUsersWithNotifications(
+  tenantId: string,
+  useServiceClient: boolean = false
+) {
+  const supabase = useServiceClient
+    ? createServiceClient()
+    : await createServerClient();
 
   const { data: users } = await supabase
     .from("profiles")
@@ -87,7 +99,10 @@ export async function sendEmailNotification(
 
   try {
     // 1. Check user's notification preferences
-    const preferences = await getNotificationPreferences(params.to);
+    const preferences = await getNotificationPreferences(
+      params.to,
+      params.useServiceClient
+    );
 
     // 2. Check if this notification type is enabled
     const typeMap: Record<NotificationType, boolean> = {
@@ -191,9 +206,13 @@ function getEmailTemplate(type: NotificationType, data: any) {
 export async function notifyTenantUsers(
   tenantId: string,
   type: NotificationType,
-  data: any
+  data: any,
+  useServiceClient: boolean = false
 ): Promise<{ success: boolean; sent: number; failed: number }> {
-  const users = await getTenantUsersWithNotifications(tenantId);
+  const users = await getTenantUsersWithNotifications(
+    tenantId,
+    useServiceClient
+  );
 
   let sent = 0;
   let failed = 0;
@@ -204,6 +223,7 @@ export async function notifyTenantUsers(
       type,
       data,
       tenantId,
+      useServiceClient,
     });
 
     if (result.success) {
