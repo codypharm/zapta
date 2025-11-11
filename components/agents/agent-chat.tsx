@@ -4,11 +4,12 @@ import { useState, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Bot, User, Loader2, Send } from "lucide-react";
+import { Bot, User, Loader2, Send, FileText } from "lucide-react";
 
 interface Message {
   role: "user" | "assistant";
   content: string;
+  sources?: string[];
 }
 
 interface AgentChatProps {
@@ -49,7 +50,11 @@ export function AgentChat({ agentId, agentStatus }: AgentChatProps) {
         setMessages((prev) => prev.slice(0, -1));
       } else if (response.message) {
         // Add assistant response
-        setMessages((prev) => [...prev, { role: "assistant", content: response.message! }]);
+        setMessages((prev) => [...prev, { 
+          role: "assistant", 
+          content: response.message!,
+          sources: response.sources 
+        }]);
       }
     } catch (err) {
       setError("Failed to send message");
@@ -102,6 +107,24 @@ export function AgentChat({ agentId, agentStatus }: AgentChatProps) {
                   }`}
                 >
                   <p className="whitespace-pre-wrap">{message.content}</p>
+                  {message.role === "assistant" && message.sources && message.sources.length > 0 && (
+                    <div className="mt-2 pt-2 border-t border-gray-100">
+                      <div className="flex items-center gap-1 text-xs text-gray-500 mb-1">
+                        <FileText className="w-3 h-3" />
+                        <span>Sources:</span>
+                      </div>
+                      <div className="flex flex-wrap gap-1">
+                        {message.sources.map((source, idx) => (
+                          <span 
+                            key={idx}
+                            className="inline-block px-2 py-1 bg-gray-50 text-xs text-gray-600 rounded"
+                          >
+                            {source}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
                 {message.role === "user" && (
                   <div className="w-8 h-8 rounded-full bg-gray-200 flex items-center justify-center flex-shrink-0">
