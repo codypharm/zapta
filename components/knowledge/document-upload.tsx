@@ -96,11 +96,14 @@ export function DocumentUpload({ agentId, onUploadComplete }: DocumentUploadProp
 
   const extractTextFromPDF = async (file: File): Promise<string> => {
     const arrayBuffer = await file.arrayBuffer();
-    const pdfParse = await import('pdf-parse');
+    const { PDFParse } = await import('pdf-parse');
     
     try {
-      const data = await pdfParse.default(arrayBuffer);
-      return data.text;
+      const uint8Array = new Uint8Array(arrayBuffer);
+      const parser = new PDFParse({ data: uint8Array });
+      const result = await parser.getText();
+      await parser.destroy();
+      return result.text;
     } catch (error) {
       throw new Error("Failed to extract text from PDF. The file may be corrupted or password protected.");
     }
