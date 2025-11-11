@@ -107,6 +107,23 @@ export interface Database {
         Insert: Omit<Database['public']['Tables']['usage_metrics']['Row'], 'id' | 'created_at'>;
         Update: Partial<Database['public']['Tables']['usage_metrics']['Insert']>;
       };
+      documents: {
+        Row: {
+          id: string;
+          tenant_id: string;
+          agent_id: string | null;
+          name: string;
+          content: string;
+          embedding: number[] | null;
+          embedding_model: string | null;
+          embedding_dimensions: number | null;
+          metadata: Json;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: Omit<Database['public']['Tables']['documents']['Row'], 'id' | 'created_at' | 'updated_at'>;
+        Update: Partial<Database['public']['Tables']['documents']['Insert']>;
+      };
     };
   };
 }

@@ -7,9 +7,10 @@ import { createServerClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { ArrowLeft, Edit, Code2 } from "lucide-react";
+import { ArrowLeft, Edit, Code2, FileText, MessageSquare } from "lucide-react";
 import Link from "next/link";
 import { AgentChat } from "@/components/agents/agent-chat";
+import { KnowledgeBasePrompt } from "@/components/agents/knowledge-base-prompt";
 
 export default async function AgentDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -79,6 +80,18 @@ export default async function AgentDetailPage({ params }: { params: Promise<{ id
             </div>
             <div className="flex gap-2">
               <Button asChild variant="outline" size="sm">
+                <Link href={`/conversations?agent=${agent.id}`}>
+                  <MessageSquare className="w-4 h-4 mr-2" />
+                  Conversations
+                </Link>
+              </Button>
+              <Button asChild variant="outline" size="sm">
+                <Link href={`/agents/${agent.id}/knowledge`}>
+                  <FileText className="w-4 h-4 mr-2" />
+                  Knowledge
+                </Link>
+              </Button>
+              <Button asChild variant="outline" size="sm">
                 <Link href={`/agents/${agent.id}/widget`}>
                   <Code2 className="w-4 h-4 mr-2" />
                   Widget
@@ -96,7 +109,15 @@ export default async function AgentDetailPage({ params }: { params: Promise<{ id
       </div>
 
       {/* Chat Area */}
-      <div className="flex-1 overflow-hidden bg-muted/30">
+      <div className="flex-1 overflow-hidden bg-muted/30 relative">
+        {/* Knowledge Base Prompt - absolute positioned overlay */}
+        <div className="absolute top-0 left-0 right-0 z-10 p-6">
+          <div className="max-w-4xl mx-auto">
+            <KnowledgeBasePrompt agentId={agent.id} />
+          </div>
+        </div>
+        
+        {/* Chat Interface - original full layout */}
         <div className="h-full max-w-4xl mx-auto flex flex-col">
           <AgentChat agentId={agent.id} agentStatus={agent.status} />
         </div>

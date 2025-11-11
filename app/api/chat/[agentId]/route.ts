@@ -10,6 +10,8 @@ import { createGoogleGenerativeAI } from "@ai-sdk/google";
 import { createAnthropic } from "@ai-sdk/anthropic";
 import { createOpenAI } from "@ai-sdk/openai";
 import { notifyTenantUsers } from "@/lib/notifications/email";
+import { searchDocuments } from "@/lib/knowledge/actions";
+import { trackSearchQuery, trackSearchHit, trackContextUsage } from "@/lib/knowledge/analytics";
 
 // Create Supabase client with service role (bypass RLS for public endpoint)
 const supabase = createClient(
@@ -20,6 +22,16 @@ const supabase = createClient(
 interface Message {
   role: "user" | "assistant";
   content: string;
+}
+
+interface SearchDocument {
+  id: string;
+  content: string;
+  metadata?: {
+    originalFileName?: string;
+    [key: string]: any;
+  };
+  similarity?: number;
 }
 
 export async function POST(
@@ -68,11 +80,16 @@ export async function POST(
       );
     }
 
-    // Build system prompt
+    // Search knowledge base for relevant context
+    const userSession = `widget-${sessionId}-${Date.now()}`;
+    const ragContext = await getRAGContext(agent.tenant_id, agentId, message, userSession);
+
+    // Build system prompt with RAG context
     const systemPrompt = buildSystemPrompt(
       agent.name,
       agent.config.instructions,
-      agent.config.tone
+      agent.config.tone,
+      ragContext.hasContext ? ragContext.context : undefined
     );
 
     // Prepare conversation messages
@@ -101,10 +118,11 @@ export async function POST(
       { role: "assistant", content: text },
     ], leadId);
 
-    // Return response
+    // Return response with sources
     return NextResponse.json({
       message: text,
       sessionId,
+      sources: ragContext.hasContext ? ragContext.sources : undefined,
     });
   } catch (error) {
     console.error("Widget chat error:", error);
@@ -116,9 +134,95 @@ export async function POST(
 }
 
 /**
+ * Search knowledge base and format context for AI (Widget version)
+ */
+async function getRAGContext(tenantId: string, agentId: string, message: string, userSession?: string) {
+  try {
+    console.log(`🔍 Widget RAG search for agent ${agentId}: "${message}"`);
+    console.log(`   └─ Tenant: ${tenantId}, Agent: ${agentId || 'global'}, Threshold: 0.7`);
+    
+    const result = await searchDocuments(tenantId, message, agentId, 3, 0.7, userSession);
+    
+    if (result.success) {
+      if (result.documents.length > 0) {
+        console.log(`✅ Found ${result.documents.length} relevant documents for widget chat:`);
+        
+        // Log each document with similarity score
+        result.documents.forEach((doc: SearchDocument, idx: number) => {
+          const similarity = ((doc.similarity || 0) * 100).toFixed(1);
+          const filename = doc.metadata?.originalFileName || 'Unknown';
+          const preview = doc.content.substring(0, 100);
+          console.log(`   ${idx + 1}. ${filename} (${similarity}% match)`);
+          console.log(`      Preview: "${preview}${doc.content.length > 100 ? '...' : ''}"`);
+        });
+        
+        // Track context usage for analytics
+        try {
+          for (const doc of result.documents as SearchDocument[]) {
+            await trackContextUsage(
+              tenantId,
+              agentId,
+              doc.id,
+              message,
+              doc.similarity || 0,
+              userSession
+            );
+          }
+        } catch (analyticsError) {
+          console.error("Widget analytics tracking failed:", analyticsError);
+        }
+        
+        const context = result.documents
+          .map((doc: SearchDocument) => `[Document: ${doc.metadata?.originalFileName || 'Unknown'}]\n${doc.content}`)
+          .join('\n\n---\n\n');
+        
+        return {
+          hasContext: true,
+          context,
+          sources: result.documents.map((doc: SearchDocument) => doc.metadata?.originalFileName || 'Unknown'),
+        };
+      } else {
+        // Check if there are ANY documents for this agent/tenant
+        const { data: allDocs } = await supabase
+          .from('documents')
+          .select('id, name, metadata')
+          .eq('tenant_id', tenantId)
+          .eq('agent_id', agentId);
+        
+        const docCount = allDocs?.length || 0;
+        console.log(`ℹ️  No relevant documents found for widget query: "${message}"`);
+        console.log(`   └─ Available documents: ${docCount}`);
+        
+        if (docCount === 0) {
+          console.log(`   └─ ⚠️  No documents uploaded for this agent yet`);
+        } else {
+          console.log(`   └─ Available docs:`);
+          allDocs?.slice(0, 3).forEach((doc, idx) => {
+            const filename = doc.metadata?.originalFileName || doc.name;
+            console.log(`      ${idx + 1}. ${filename}`);
+          });
+          if (docCount > 3) {
+            console.log(`      ... and ${docCount - 3} more`);
+          }
+          console.log(`   └─ 💡 Try lowering threshold or ask more specific questions`);
+        }
+        
+        return { hasContext: false, context: '', sources: [] };
+      }
+    } else {
+      console.error(`❌ Document search failed: ${result.error}`);
+      return { hasContext: false, context: '', sources: [] };
+    }
+  } catch (error) {
+    console.error('Widget RAG search error:', error);
+    return { hasContext: false, context: '', sources: [] };
+  }
+}
+
+/**
  * Build system prompt based on agent configuration
  */
-function buildSystemPrompt(name: string, instructions: string, tone: string): string {
+function buildSystemPrompt(name: string, instructions: string, tone: string, context?: string): string {
   const toneInstructions = {
     professional:
       "Maintain a professional and courteous tone in all responses.",
@@ -130,17 +234,25 @@ function buildSystemPrompt(name: string, instructions: string, tone: string): st
       "Use formal language and maintain a serious, respectful tone throughout.",
   };
 
+  const contextSection = context ? `
+
+RELEVANT KNOWLEDGE BASE CONTENT:
+${context}
+
+Use the above knowledge base content to inform your responses when relevant. If the user's question relates to information in the knowledge base, prioritize that information in your answer. If the knowledge base doesn't contain relevant information, rely on your general knowledge.` : '';
+
   return `You are ${name}, an AI assistant.
 
 ${instructions}
 
-${toneInstructions[tone as keyof typeof toneInstructions] || toneInstructions.professional}
+${toneInstructions[tone as keyof typeof toneInstructions] || toneInstructions.professional}${contextSection}
 
 Important guidelines:
 - Be concise and clear in your responses
 - If you don't know something, admit it rather than making up information
 - Stay focused on helping the user with their query
-- Always be respectful and helpful`;
+- Always be respectful and helpful
+${context ? '- When using knowledge base information, be specific and cite the relevant documents when helpful' : ''}`;
 }
 
 /**

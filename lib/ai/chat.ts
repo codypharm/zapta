@@ -1,6 +1,6 @@
 /**
  * AI Chat Integration
- * Handles sending messages to AI models and tracking usage
+ * Handles sending messages to AI models and tracking usage with RAG support
  */
 
 "use server";
@@ -10,14 +10,68 @@ import { generateText } from "ai";
 import { createAnthropic } from "@ai-sdk/anthropic";
 import { createOpenAI } from "@ai-sdk/openai";
 import { createGoogleGenerativeAI } from "@ai-sdk/google";
+import { searchDocuments } from "@/lib/knowledge/actions";
+import { trackContextUsage } from "@/lib/knowledge/analytics";
 
 interface Message {
   role: "user" | "assistant";
   content: string;
 }
 
+interface SearchDocument {
+  id: string;
+  content: string;
+  metadata?: {
+    originalFileName?: string;
+    [key: string]: any;
+  };
+  similarity?: number;
+}
+
 /**
- * Send a message to an agent and get AI response
+ * Search knowledge base and format context for AI
+ */
+async function getRAGContext(tenantId: string, agentId: string, message: string, userSession?: string) {
+  try {
+    const result = await searchDocuments(tenantId, message, agentId, 3, 0.7, userSession);
+    
+    if (result.success && result.documents.length > 0) {
+      // Track context usage for analytics
+      try {
+        for (const doc of result.documents) {
+          await trackContextUsage(
+            tenantId,
+            agentId,
+            doc.id,
+            message,
+            doc.similarity || 0,
+            userSession
+          );
+        }
+      } catch (analyticsError) {
+        console.error("Failed to track context usage:", analyticsError);
+      }
+      
+      const context = result.documents
+        .map((doc: SearchDocument) => `[Document: ${doc.metadata?.originalFileName || 'Unknown'}]\n${doc.content}`)
+        .join('\n\n---\n\n');
+      
+      return {
+        hasContext: true,
+        context,
+        sources: result.documents.map((doc: SearchDocument) => doc.metadata?.originalFileName || 'Unknown'),
+      };
+    }
+    
+    return { hasContext: false, context: '', sources: [] };
+  } catch (error) {
+    console.error('RAG search error:', error);
+    return { hasContext: false, context: '', sources: [] };
+  }
+}
+
+/**
+ * Send a message to an agent and get AI response with RAG support
  */
 export async function sendMessage(
   agentId: string,
@@ -86,11 +140,16 @@ export async function sendMessage(
       };
     }
 
+    // Search knowledge base for relevant context
+    const userSession = `${user.id}-${Date.now()}`;
+    const ragContext = await getRAGContext(profile.tenant_id, agentId, message, userSession);
+
     // Build the prompt with agent configuration
     const systemPrompt = buildSystemPrompt(
       agent.name,
       agent.config.instructions,
-      agent.config.tone
+      agent.config.tone,
+      ragContext.hasContext ? ragContext.context : undefined
     );
 
     // Prepare conversation history
@@ -121,7 +180,10 @@ export async function sendMessage(
       usage?.outputTokens || 0
     );
 
-    return { message: text };
+    return { 
+      message: text,
+      sources: ragContext.hasContext ? ragContext.sources : undefined
+    };
   } catch (error) {
     console.error("AI chat error:", error);
     return { error: "Failed to get AI response. Please try again." };
@@ -131,7 +193,7 @@ export async function sendMessage(
 /**
  * Build system prompt based on agent configuration
  */
-function buildSystemPrompt(name: string, instructions: string, tone: string): string {
+function buildSystemPrompt(name: string, instructions: string, tone: string, context?: string): string {
   const toneInstructions = {
     professional:
       "Maintain a professional and courteous tone in all responses.",
@@ -143,17 +205,25 @@ function buildSystemPrompt(name: string, instructions: string, tone: string): st
       "Use formal language and maintain a serious, respectful tone throughout.",
   };
 
+  const contextSection = context ? `
+
+RELEVANT KNOWLEDGE BASE CONTENT:
+${context}
+
+Use the above knowledge base content to inform your responses when relevant. If the user's question relates to information in the knowledge base, prioritize that information in your answer. If the knowledge base doesn't contain relevant information, rely on your general knowledge.` : '';
+
   return `You are ${name}, an AI assistant.
 
 ${instructions}
 
-${toneInstructions[tone as keyof typeof toneInstructions] || toneInstructions.professional}
+${toneInstructions[tone as keyof typeof toneInstructions] || toneInstructions.professional}${contextSection}
 
 Important guidelines:
 - Be concise and clear in your responses
 - If you don't know something, admit it rather than making up information
 - Stay focused on helping the user with their query
-- Always be respectful and helpful`;
+- Always be respectful and helpful
+${context ? '- When using knowledge base information, be specific and cite the relevant documents when helpful' : ''}`;
 }
 
 /**
@@ -211,7 +281,7 @@ function selectAIModel(modelName: string) {
  * Log usage metrics to database
  */
 async function logUsage(
-  supabase: any,
+  supabase: Awaited<ReturnType<typeof createServerClient>>,
   tenantId: string,
   agentId: string,
   promptTokens: number,
