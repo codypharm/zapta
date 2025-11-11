@@ -26,18 +26,25 @@ export function DocumentUpload({ agentId, onUploadComplete }: DocumentUploadProp
 
   const handleFileSelect = useCallback(async (selectedFile: File) => {
     // Check file type
-    const allowedTypes = ['text/plain', 'text/markdown', 'text/csv', 'application/json'];
-    const allowedExtensions = ['.txt', '.md', '.csv', '.json'];
+    const allowedTypes = [
+      'text/plain', 
+      'text/markdown', 
+      'text/csv', 
+      'application/json',
+      'application/pdf',
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document' // DOCX
+    ];
+    const allowedExtensions = ['.txt', '.md', '.csv', '.json', '.pdf', '.docx', '.doc'];
     const fileExtension = selectedFile.name.toLowerCase().substring(selectedFile.name.lastIndexOf('.'));
     
     if (!allowedTypes.includes(selectedFile.type) && !allowedExtensions.includes(fileExtension)) {
-      setError("Please upload a supported file type (.txt, .md, .csv, .json)");
+      setError("Please upload a supported file type (.txt, .md, .csv, .json, .pdf, .docx)");
       return;
     }
 
-    // Check file size (5MB limit)
-    if (selectedFile.size > 5 * 1024 * 1024) {
-      setError("File size must be less than 5MB");
+    // Check file size (10MB limit for PDF/DOCX)
+    if (selectedFile.size > 10 * 1024 * 1024) {
+      setError("File size must be less than 10MB");
       return;
     }
 
@@ -45,12 +52,12 @@ export function DocumentUpload({ agentId, onUploadComplete }: DocumentUploadProp
     setName(selectedFile.name);
     setError("");
 
-    // Read file content
+    // Read file content based on type
     try {
-      const text = await readFileAsText(selectedFile);
+      const text = await extractTextFromFile(selectedFile);
       setContent(text);
     } catch (err) {
-      setError("Failed to read file. Please ensure it's a valid text file.");
+      setError("Failed to read file. Please ensure it's a valid document.");
     }
   }, []);
 
@@ -67,6 +74,51 @@ export function DocumentUpload({ agentId, onUploadComplete }: DocumentUploadProp
       reader.onerror = () => reject(new Error("Failed to read file"));
       reader.readAsText(file);
     });
+  };
+
+  const extractTextFromFile = async (file: File): Promise<string> => {
+    const fileExtension = file.name.toLowerCase().substring(file.name.lastIndexOf('.'));
+    
+    switch (fileExtension) {
+      case '.pdf':
+        return await extractTextFromPDF(file);
+      case '.docx':
+      case '.doc':
+        return await extractTextFromDocx(file);
+      case '.txt':
+      case '.md':
+      case '.csv':
+      case '.json':
+      default:
+        return await readFileAsText(file);
+    }
+  };
+
+  const extractTextFromPDF = async (file: File): Promise<string> => {
+    const arrayBuffer = await file.arrayBuffer();
+    const { PDFParse } = await import('pdf-parse');
+    
+    try {
+      const uint8Array = new Uint8Array(arrayBuffer);
+      const parser = new PDFParse({ data: uint8Array });
+      const result = await parser.getText();
+      await parser.destroy();
+      return result.text;
+    } catch (error) {
+      throw new Error("Failed to extract text from PDF. The file may be corrupted or password protected.");
+    }
+  };
+
+  const extractTextFromDocx = async (file: File): Promise<string> => {
+    const arrayBuffer = await file.arrayBuffer();
+    const mammoth = await import('mammoth');
+    
+    try {
+      const result = await mammoth.extractRawText({ arrayBuffer });
+      return result.value;
+    } catch (error) {
+      throw new Error("Failed to extract text from Word document. The file may be corrupted or password protected.");
+    }
   };
 
   // Drag and drop handlers
@@ -195,12 +247,12 @@ export function DocumentUpload({ agentId, onUploadComplete }: DocumentUploadProp
                   ref={fileInputRef}
                   type="file"
                   className="sr-only"
-                  accept=".txt,.md,.csv,.json"
+                  accept=".txt,.md,.csv,.json,.pdf,.docx,.doc"
                   onChange={handleFileChange}
                 />
               </div>
               <p className="mt-1 text-xs text-gray-500">
-                Supports .txt, .md, .csv, .json files up to 5MB
+                Supports .txt, .md, .csv, .json, .pdf, .docx files up to 10MB
               </p>
             </div>
 
