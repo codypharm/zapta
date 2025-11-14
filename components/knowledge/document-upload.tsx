@@ -2,11 +2,9 @@
 
 import { useState, useRef, useCallback } from "react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Upload, FileText, Loader2, X } from "lucide-react";
+import { Upload, FileText, Loader2, X, CheckCircle2, AlertCircle } from "lucide-react";
 import { uploadDocument } from "@/lib/knowledge/client-actions";
 
 interface DocumentUploadProps {
@@ -14,57 +12,66 @@ interface DocumentUploadProps {
   onUploadComplete?: () => void;
 }
 
+interface FileWithStatus {
+  file: File;
+  id: string;
+  status: 'pending' | 'extracting' | 'uploading' | 'success' | 'error';
+  error?: string;
+  extractedText?: string;
+  chunksCreated?: number;
+}
+
 export function DocumentUpload({ agentId, onUploadComplete }: DocumentUploadProps) {
-  const [isUploading, setIsUploading] = useState(false);
-  const [name, setName] = useState("");
-  const [content, setContent] = useState("");
-  const [file, setFile] = useState<File | null>(null);
-  const [error, setError] = useState("");
-  const [success, setSuccess] = useState("");
+  const [files, setFiles] = useState<FileWithStatus[]>([]);
+  const [isProcessing, setIsProcessing] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
+  const [generalError, setGeneralError] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const handleFileSelect = useCallback(async (selectedFile: File) => {
-    // Check file type
+  const validateFile = (file: File): string | null => {
     const allowedTypes = [
-      'text/plain', 
-      'text/markdown', 
-      'text/csv', 
+      'text/plain',
+      'text/markdown',
+      'text/csv',
       'application/json',
       'application/pdf',
-      'application/vnd.openxmlformats-officedocument.wordprocessingml.document' // DOCX
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
     ];
     const allowedExtensions = ['.txt', '.md', '.csv', '.json', '.pdf', '.docx', '.doc'];
-    const fileExtension = selectedFile.name.toLowerCase().substring(selectedFile.name.lastIndexOf('.'));
-    
-    if (!allowedTypes.includes(selectedFile.type) && !allowedExtensions.includes(fileExtension)) {
-      setError("Please upload a supported file type (.txt, .md, .csv, .json, .pdf, .docx)");
-      return;
+    const fileExtension = file.name.toLowerCase().substring(file.name.lastIndexOf('.'));
+
+    if (!allowedTypes.includes(file.type) && !allowedExtensions.includes(fileExtension)) {
+      return "Unsupported file type. Please upload .txt, .md, .csv, .json, .pdf, or .docx files";
     }
 
-    // Check file size (10MB limit for PDF/DOCX)
-    if (selectedFile.size > 10 * 1024 * 1024) {
-      setError("File size must be less than 10MB");
-      return;
+    if (file.size > 10 * 1024 * 1024) {
+      return "File size must be less than 10MB";
     }
 
-    setFile(selectedFile);
-    setName(selectedFile.name);
-    setError("");
+    return null;
+  };
 
-    // Read file content based on type
-    try {
-      const text = await extractTextFromFile(selectedFile);
-      setContent(text);
-    } catch (err) {
-      setError("Failed to read file. Please ensure it's a valid document.");
-    }
+  const handleFilesSelect = useCallback(async (selectedFiles: FileList | File[]) => {
+    setGeneralError("");
+    const fileArray = Array.from(selectedFiles);
+
+    const newFiles: FileWithStatus[] = fileArray.map(file => {
+      const validationError = validateFile(file);
+      return {
+        file,
+        id: `${file.name}-${Date.now()}-${Math.random()}`,
+        status: validationError ? 'error' : 'pending',
+        error: validationError || undefined,
+      };
+    });
+
+    setFiles(prev => [...prev, ...newFiles]);
   }, []);
 
   const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const selectedFile = event.target.files?.[0];
-    if (!selectedFile) return;
-    await handleFileSelect(selectedFile);
+    if (event.target.files && event.target.files.length > 0) {
+      await handleFilesSelect(event.target.files);
+    }
   };
 
   const readFileAsText = (file: File): Promise<string> => {
@@ -76,48 +83,42 @@ export function DocumentUpload({ agentId, onUploadComplete }: DocumentUploadProp
     });
   };
 
+  const extractTextViaAPI = async (file: File): Promise<string> => {
+    const formData = new FormData();
+    formData.append('file', file);
+
+    const response = await fetch('/api/knowledge/extract', {
+      method: 'POST',
+      body: formData,
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      throw new Error(data.error || 'Server-side extraction failed');
+    }
+
+    if (!data.success || !data.text) {
+      throw new Error('No text extracted from file');
+    }
+
+    return data.text;
+  };
+
   const extractTextFromFile = async (file: File): Promise<string> => {
     const fileExtension = file.name.toLowerCase().substring(file.name.lastIndexOf('.'));
-    
+
     switch (fileExtension) {
       case '.pdf':
-        return await extractTextFromPDF(file);
       case '.docx':
       case '.doc':
-        return await extractTextFromDocx(file);
+        return await extractTextViaAPI(file);
       case '.txt':
       case '.md':
       case '.csv':
       case '.json':
       default:
         return await readFileAsText(file);
-    }
-  };
-
-  const extractTextFromPDF = async (file: File): Promise<string> => {
-    const arrayBuffer = await file.arrayBuffer();
-    const { PDFParse } = await import('pdf-parse');
-    
-    try {
-      const uint8Array = new Uint8Array(arrayBuffer);
-      const parser = new PDFParse({ data: uint8Array });
-      const result = await parser.getText();
-      await parser.destroy();
-      return result.text;
-    } catch (error) {
-      throw new Error("Failed to extract text from PDF. The file may be corrupted or password protected.");
-    }
-  };
-
-  const extractTextFromDocx = async (file: File): Promise<string> => {
-    const arrayBuffer = await file.arrayBuffer();
-    const mammoth = await import('mammoth');
-    
-    try {
-      const result = await mammoth.extractRawText({ arrayBuffer });
-      return result.value;
-    } catch (error) {
-      throw new Error("Failed to extract text from Word document. The file may be corrupted or password protected.");
     }
   };
 
@@ -144,190 +145,273 @@ export function DocumentUpload({ agentId, onUploadComplete }: DocumentUploadProp
     e.stopPropagation();
     setIsDragging(false);
 
-    const files = Array.from(e.dataTransfer.files);
-    if (files.length > 0) {
-      await handleFileSelect(files[0]);
+    const droppedFiles = Array.from(e.dataTransfer.files);
+    if (droppedFiles.length > 0) {
+      await handleFilesSelect(droppedFiles);
     }
-  }, [handleFileSelect]);
+  }, [handleFilesSelect]);
 
-  const removeFile = () => {
-    setFile(null);
-    setName("");
-    setContent("");
+  const removeFile = (id: string) => {
+    setFiles(prev => prev.filter(f => f.id !== id));
+  };
+
+  const clearAll = () => {
+    setFiles([]);
+    setGeneralError("");
     if (fileInputRef.current) {
       fileInputRef.current.value = "";
     }
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!name.trim() || !content.trim()) {
-      setError("Please provide both a name and content for the document.");
+  const handleUploadAll = async () => {
+    const filesToUpload = files.filter(f => f.status === 'pending' || f.status === 'error');
+
+    if (filesToUpload.length === 0) {
+      setGeneralError("No files to upload. Please add some files first.");
       return;
     }
 
-    setIsUploading(true);
-    setError("");
-    setSuccess("");
+    setIsProcessing(true);
+    setGeneralError("");
 
-    try {
-      const result = await uploadDocument(
-        name.trim(),
-        content.trim(),
-        agentId,
-        {
-          fileType: file?.type,
-          fileSize: file?.size,
+    // Process files sequentially
+    for (const fileWithStatus of filesToUpload) {
+      try {
+        // Update status to extracting
+        setFiles(prev => prev.map(f =>
+          f.id === fileWithStatus.id
+            ? { ...f, status: 'extracting' as const, error: undefined }
+            : f
+        ));
+
+        // Extract text from file
+        const extractedText = await extractTextFromFile(fileWithStatus.file);
+
+        // Update status to uploading
+        setFiles(prev => prev.map(f =>
+          f.id === fileWithStatus.id
+            ? { ...f, status: 'uploading' as const, extractedText }
+            : f
+        ));
+
+        // Upload to server
+        const result = await uploadDocument(
+          fileWithStatus.file.name,
+          extractedText,
+          agentId,
+          {
+            fileType: fileWithStatus.file.type,
+            fileSize: fileWithStatus.file.size,
+          }
+        );
+
+        if (result.success) {
+          // Update status to success
+          setFiles(prev => prev.map(f =>
+            f.id === fileWithStatus.id
+              ? { ...f, status: 'success' as const, chunksCreated: result.chunksCreated }
+              : f
+          ));
+        } else {
+          throw new Error(result.error || "Upload failed");
         }
-      );
-
-      if (result.success) {
-        setSuccess(`Document uploaded successfully! Created ${result.chunksCreated} chunks for optimal search.`);
-        setName("");
-        setContent("");
-        setFile(null);
-        onUploadComplete?.();
-      } else {
-        setError(result.error || "Failed to upload document");
+      } catch (error) {
+        // Update status to error
+        setFiles(prev => prev.map(f =>
+          f.id === fileWithStatus.id
+            ? {
+                ...f,
+                status: 'error' as const,
+                error: error instanceof Error ? error.message : "Unknown error"
+              }
+            : f
+        ));
       }
-    } catch (err) {
-      setError("An unexpected error occurred while uploading the document.");
-    } finally {
-      setIsUploading(false);
     }
+
+    setIsProcessing(false);
+    onUploadComplete?.();
   };
+
+  const pendingCount = files.filter(f => f.status === 'pending' || f.status === 'error').length;
+  const successCount = files.filter(f => f.status === 'success').length;
+  const processingCount = files.filter(f => f.status === 'extracting' || f.status === 'uploading').length;
 
   return (
     <Card className="w-full">
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <Upload className="h-5 w-5" />
-          Upload Document
+          Upload Documents
         </CardTitle>
         <CardDescription>
-          Add documents to your knowledge base. Text will be automatically chunked and indexed for semantic search.
+          Add multiple documents to your knowledge base. Files will be automatically processed and indexed for semantic search.
         </CardDescription>
       </CardHeader>
-      <CardContent>
-        <form onSubmit={handleSubmit} className="space-y-4">
-          {error && (
-            <Alert variant="destructive">
-              <AlertDescription>{error}</AlertDescription>
-            </Alert>
-          )}
+      <CardContent className="space-y-4">
+        {generalError && (
+          <Alert variant="destructive">
+            <AlertDescription>{generalError}</AlertDescription>
+          </Alert>
+        )}
 
-          {success && (
-            <Alert>
-              <AlertDescription>{success}</AlertDescription>
-            </Alert>
-          )}
-
-          {/* Drag and Drop Area */}
-          <div
-            className={`border-2 border-dashed rounded-lg p-6 transition-colors ${
-              isDragging
-                ? "border-primary bg-primary/5"
-                : "border-gray-300 hover:border-gray-400"
-            }`}
-            onDragEnter={handleDragEnter}
-            onDragLeave={handleDragLeave}
-            onDragOver={handleDragOver}
-            onDrop={handleDrop}
-          >
-            <div className="text-center">
-              <Upload className="mx-auto h-12 w-12 text-gray-400" />
-              <div className="mt-4">
-                <label htmlFor="file-upload" className="cursor-pointer">
-                  <span className="mt-2 block text-sm font-medium text-gray-900">
-                    {isDragging ? "Drop your file here" : "Drop files here or click to browse"}
-                  </span>
-                </label>
-                <input
-                  id="file-upload"
-                  ref={fileInputRef}
-                  type="file"
-                  className="sr-only"
-                  accept=".txt,.md,.csv,.json,.pdf,.docx,.doc"
-                  onChange={handleFileChange}
-                />
-              </div>
-              <p className="mt-1 text-xs text-gray-500">
-                Supports .txt, .md, .csv, .json, .pdf, .docx files up to 10MB
-              </p>
+        {/* Drag and Drop Area */}
+        <div
+          className={`border-2 border-dashed rounded-lg p-6 transition-colors ${
+            isDragging
+              ? "border-primary bg-primary/5"
+              : "border-gray-300 hover:border-gray-400"
+          }`}
+          onDragEnter={handleDragEnter}
+          onDragLeave={handleDragLeave}
+          onDragOver={handleDragOver}
+          onDrop={handleDrop}
+        >
+          <div className="text-center">
+            <Upload className="mx-auto h-12 w-12 text-gray-400" />
+            <div className="mt-4">
+              <label htmlFor="file-upload" className="cursor-pointer">
+                <span className="mt-2 block text-sm font-medium text-gray-900">
+                  {isDragging ? "Drop your files here" : "Drop files here or click to browse"}
+                </span>
+              </label>
+              <input
+                id="file-upload"
+                ref={fileInputRef}
+                type="file"
+                multiple
+                className="sr-only"
+                accept=".txt,.md,.csv,.json,.pdf,.docx,.doc"
+                onChange={handleFileChange}
+                disabled={isProcessing}
+              />
             </div>
-
-            {file && (
-              <div className="mt-4 p-3 bg-gray-50 rounded-md">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-2">
-                    <FileText className="h-5 w-5 text-gray-400" />
-                    <span className="text-sm font-medium text-gray-900">
-                      {file.name}
-                    </span>
-                    <span className="text-xs text-gray-500">
-                      ({(file.size / 1024).toFixed(1)} KB)
-                    </span>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={removeFile}
-                    className="text-gray-400 hover:text-gray-600"
-                  >
-                    <X className="h-4 w-4" />
-                  </button>
-                </div>
-              </div>
-            )}
-          </div>
-
-          <div>
-            <label htmlFor="name" className="block text-sm font-medium mb-2">
-              Document Name *
-            </label>
-            <Input
-              id="name"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="Enter a descriptive name for this document"
-              required
-            />
-          </div>
-
-          <div>
-            <label htmlFor="content" className="block text-sm font-medium mb-2">
-              Document Content *
-            </label>
-            <Textarea
-              id="content"
-              value={content}
-              onChange={(e) => setContent(e.target.value)}
-              placeholder="Paste or type the document content here..."
-              className="min-h-[200px]"
-              required
-            />
-            <p className="text-sm text-muted-foreground mt-1">
-              Content will be automatically chunked for optimal search performance
+            <p className="mt-1 text-xs text-gray-500">
+              Supports .txt, .md, .csv, .json, .pdf, .docx files up to 10MB each
             </p>
           </div>
+        </div>
 
+        {/* File List */}
+        {files.length > 0 && (
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <h3 className="text-sm font-medium">
+                Files ({files.length})
+                {successCount > 0 && (
+                  <span className="ml-2 text-green-600">
+                    {successCount} uploaded
+                  </span>
+                )}
+              </h3>
+              {!isProcessing && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={clearAll}
+                  className="text-xs"
+                >
+                  Clear All
+                </Button>
+              )}
+            </div>
+
+            <div className="space-y-2 max-h-[400px] overflow-y-auto">
+              {files.map((fileWithStatus) => (
+                <div
+                  key={fileWithStatus.id}
+                  className={`p-3 rounded-md border ${
+                    fileWithStatus.status === 'success'
+                      ? 'bg-green-50 border-green-200'
+                      : fileWithStatus.status === 'error'
+                      ? 'bg-red-50 border-red-200'
+                      : 'bg-gray-50 border-gray-200'
+                  }`}
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="flex items-start gap-2 flex-1 min-w-0">
+                      {fileWithStatus.status === 'success' ? (
+                        <CheckCircle2 className="h-5 w-5 text-green-600 flex-shrink-0 mt-0.5" />
+                      ) : fileWithStatus.status === 'error' ? (
+                        <AlertCircle className="h-5 w-5 text-red-600 flex-shrink-0 mt-0.5" />
+                      ) : fileWithStatus.status === 'extracting' || fileWithStatus.status === 'uploading' ? (
+                        <Loader2 className="h-5 w-5 text-blue-600 animate-spin flex-shrink-0 mt-0.5" />
+                      ) : (
+                        <FileText className="h-5 w-5 text-gray-400 flex-shrink-0 mt-0.5" />
+                      )}
+
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm font-medium text-gray-900 truncate">
+                            {fileWithStatus.file.name}
+                          </span>
+                          <span className="text-xs text-gray-500 flex-shrink-0">
+                            ({(fileWithStatus.file.size / 1024).toFixed(1)} KB)
+                          </span>
+                        </div>
+
+                        {fileWithStatus.status === 'extracting' && (
+                          <p className="text-xs text-blue-600 mt-1">
+                            Extracting text...
+                          </p>
+                        )}
+
+                        {fileWithStatus.status === 'uploading' && (
+                          <p className="text-xs text-blue-600 mt-1">
+                            Uploading to knowledge base...
+                          </p>
+                        )}
+
+                        {fileWithStatus.status === 'success' && fileWithStatus.chunksCreated && (
+                          <p className="text-xs text-green-600 mt-1">
+                            Uploaded! Created {fileWithStatus.chunksCreated} chunk{fileWithStatus.chunksCreated > 1 ? 's' : ''}
+                          </p>
+                        )}
+
+                        {fileWithStatus.status === 'error' && fileWithStatus.error && (
+                          <p className="text-xs text-red-600 mt-1">
+                            {fileWithStatus.error}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+
+                    {!isProcessing && fileWithStatus.status !== 'extracting' && fileWithStatus.status !== 'uploading' && (
+                      <button
+                        type="button"
+                        onClick={() => removeFile(fileWithStatus.id)}
+                        className="text-gray-400 hover:text-gray-600 flex-shrink-0"
+                      >
+                        <X className="h-4 w-4" />
+                      </button>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Upload Button */}
+        {files.length > 0 && (
           <Button
-            type="submit"
-            disabled={isUploading || !name.trim() || !content.trim()}
+            onClick={handleUploadAll}
+            disabled={isProcessing || pendingCount === 0}
             className="w-full"
           >
-            {isUploading ? (
+            {isProcessing ? (
               <>
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Processing Document...
+                Processing {processingCount} of {files.length} files...
               </>
             ) : (
               <>
-                <FileText className="mr-2 h-4 w-4" />
-                Upload Document
+                <Upload className="mr-2 h-4 w-4" />
+                Upload {pendingCount} File{pendingCount !== 1 ? 's' : ''}
               </>
             )}
           </Button>
-        </form>
+        )}
       </CardContent>
     </Card>
   );

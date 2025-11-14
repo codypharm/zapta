@@ -295,11 +295,30 @@ export async function deleteDocument(tenantId: string, documentName: string) {
   const supabase = await createServerClient();
 
   try {
+    // First, get all chunks for this document to verify it exists
+    const { data: chunks, error: selectError } = await supabase
+      .from("documents")
+      .select("id")
+      .eq("tenant_id", tenantId)
+      .eq("metadata->>originalFileName", documentName);
+
+    if (selectError) {
+      throw new Error(`Database error: ${selectError.message}`);
+    }
+
+    if (!chunks || chunks.length === 0) {
+      return {
+        success: false,
+        error: "Document not found",
+      };
+    }
+
+    // Delete all chunks for this document
     const { error } = await supabase
       .from("documents")
       .delete()
       .eq("tenant_id", tenantId)
-      .eq("name", documentName);
+      .eq("metadata->>originalFileName", documentName);
 
     if (error) {
       throw new Error(`Database error: ${error.message}`);
