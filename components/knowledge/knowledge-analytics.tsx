@@ -45,7 +45,7 @@ interface SearchEffectiveness {
 
 interface TopQuery {
   query: string;
-  count: number;
+  search_count: number;
   avg_score: number;
 }
 
@@ -269,7 +269,7 @@ export function KnowledgeAnalytics({ agentId }: KnowledgeAnalyticsProps) {
                         {query.query}
                       </p>
                       <Badge variant="outline">
-                        {query.count}
+                        {query.search_count}
                       </Badge>
                     </div>
                     <div className="flex items-center gap-2">

@@ -125,7 +125,7 @@ BEGIN
   WHERE
     da.tenant_id = filter_tenant_id
     AND (filter_agent_id IS NULL OR da.agent_id = filter_agent_id)
-    AND da.created_at >= NOW() - INTERVAL '%s days' % days_back
+    AND da.created_at >= NOW() - make_interval(days => days_back)
     AND da.event_type = 'context_used'
   GROUP BY da.document_id, d.name
   ORDER BY usage_count DESC
@@ -155,14 +155,14 @@ BEGIN
     COUNT(*) as total_searches,
     COUNT(*) FILTER (WHERE results_count > 0) as successful_searches,
     (COUNT(*) FILTER (WHERE results_count > 0)::FLOAT / COUNT(*)::FLOAT * 100) as success_rate,
-    AVG(results_count) as avg_results_count,
-    AVG(top_similarity_score) FILTER (WHERE top_similarity_score IS NOT NULL) as avg_similarity_score,
-    AVG(execution_time_ms) as avg_execution_time
+    AVG(results_count)::FLOAT as avg_results_count,
+    (AVG(top_similarity_score) FILTER (WHERE top_similarity_score IS NOT NULL))::FLOAT as avg_similarity_score,
+    AVG(execution_time_ms)::FLOAT as avg_execution_time
   FROM search_analytics sa
   WHERE
     sa.tenant_id = filter_tenant_id
     AND (filter_agent_id IS NULL OR sa.agent_id = filter_agent_id)
-    AND sa.created_at >= NOW() - INTERVAL '%s days' % days_back;
+    AND sa.created_at >= NOW() - make_interval(days => days_back);
 END;
 $$;
 

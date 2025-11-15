@@ -7,6 +7,7 @@ import { createServerClient } from "@/lib/supabase/server";
 import { Database } from "@/types/database";
 import { trackSearchQuery, trackSearchHit, trackContextUsage } from "@/lib/knowledge/analytics";
 import { embeddingService } from "@/lib/embeddings/providers";
+import { knowledgeConfig } from "@/lib/knowledge/config";
 
 type Document = Database['public']['Tables']['documents']['Row'];
 type DocumentInsert = Database['public']['Tables']['documents']['Insert'];
@@ -28,7 +29,10 @@ export async function generateEmbeddings(text: string): Promise<number[]> {
 /**
  * Process and chunk document content
  */
-export function chunkDocument(content: string, maxChunkSize: number = 1000): string[] {
+export function chunkDocument(
+  content: string,
+  maxChunkSize: number = knowledgeConfig.chunking.maxChunkSize
+): string[] {
   // Split by paragraphs first
   const paragraphs = content.split(/\n\s*\n/);
   const chunks: string[] = [];
@@ -89,31 +93,36 @@ export async function uploadDocument(
   try {
     // Chunk the document
     const chunks = chunkDocument(content);
-    
-    // Process each chunk
-    const documents: DocumentInsert[] = [];
-    
-    for (let i = 0; i < chunks.length; i++) {
-      const chunk = chunks[i];
-      const embeddingResult = await embeddingService.generateEmbeddings(chunk);
-      
-      documents.push({
-        tenant_id: tenantId,
-        agent_id: agentId,
-        name: chunks.length > 1 ? `${name} (Part ${i + 1})` : name,
-        content: chunk,
-        embedding: embeddingResult.embedding,
-        embedding_model: embeddingResult.provider.toLowerCase(),
-        embedding_dimensions: embeddingResult.dimensions,
-        metadata: {
-          ...metadata,
-          chunkIndex: i,
-          totalChunks: chunks.length,
-          originalFileName: name,
-          embeddingProvider: embeddingResult.provider,
-        },
-      });
-    }
+
+    // Process chunks - generate embeddings in parallel for better performance
+    const embeddingPromises = chunks.map((chunk, i) =>
+      embeddingService.generateEmbeddings(chunk).then(embeddingResult => ({
+        index: i,
+        chunk,
+        embeddingResult,
+      }))
+    );
+
+    // Wait for all embeddings to be generated
+    const embeddingResults = await Promise.all(embeddingPromises);
+
+    // Build documents array with embeddings
+    const documents: DocumentInsert[] = embeddingResults.map(({ index, chunk, embeddingResult }) => ({
+      tenant_id: tenantId,
+      agent_id: agentId,
+      name: chunks.length > 1 ? `${name} (Part ${index + 1})` : name,
+      content: chunk,
+      embedding: embeddingResult.embedding,
+      embedding_model: embeddingResult.provider.toLowerCase(),
+      embedding_dimensions: embeddingResult.dimensions,
+      metadata: {
+        ...metadata,
+        chunkIndex: index,
+        totalChunks: chunks.length,
+        originalFileName: name,
+        embeddingProvider: embeddingResult.provider,
+      },
+    }));
 
     // Insert all chunks
     const { data, error } = await supabase
@@ -146,8 +155,8 @@ export async function searchDocuments(
   tenantId: string,
   query: string,
   agentId?: string,
-  limit: number = 5,
-  threshold: number = 0.7,
+  limit: number = knowledgeConfig.search.defaultLimit,
+  threshold: number = knowledgeConfig.search.defaultThreshold,
   userSession?: string
 ) {
   const supabase = await createServerClient();
@@ -234,15 +243,23 @@ export async function searchDocuments(
 }
 
 /**
- * Get all documents for a tenant/agent
+ * Get documents for a tenant/agent with pagination
  */
-export async function getDocuments(tenantId: string, agentId?: string) {
+export async function getDocuments(
+  tenantId: string,
+  agentId?: string,
+  page: number = 1,
+  pageSize: number = knowledgeConfig.pagination.defaultPageSize
+) {
   const supabase = await createServerClient();
 
   try {
+    // Validate and cap page size
+    const effectivePageSize = Math.min(pageSize, knowledgeConfig.pagination.maxPageSize);
+
     let query = supabase
       .from("documents")
-      .select("*")
+      .select("*", { count: 'exact' })
       .eq("tenant_id", tenantId)
       .order("created_at", { ascending: false });
 
@@ -250,7 +267,8 @@ export async function getDocuments(tenantId: string, agentId?: string) {
       query = query.eq("agent_id", agentId);
     }
 
-    const { data, error } = await query;
+    // Fetch all documents first to group by original file
+    const { data: allDocs, error, count } = await query;
 
     if (error) {
       throw new Error(`Database error: ${error.message}`);
@@ -258,8 +276,8 @@ export async function getDocuments(tenantId: string, agentId?: string) {
 
     // Group chunks by original document
     const groupedDocs = new Map();
-    
-    for (const doc of data || []) {
+
+    for (const doc of allDocs || []) {
       const originalName = doc.metadata?.originalFileName || doc.name;
       if (!groupedDocs.has(originalName)) {
         groupedDocs.set(originalName, {
@@ -274,15 +292,38 @@ export async function getDocuments(tenantId: string, agentId?: string) {
       groupedDocs.get(originalName).chunks.push(doc);
     }
 
+    const allGroupedDocs = Array.from(groupedDocs.values());
+    const totalDocuments = allGroupedDocs.length;
+    const totalPages = Math.ceil(totalDocuments / effectivePageSize);
+
+    // Apply pagination to grouped results
+    const startIndex = (page - 1) * effectivePageSize;
+    const endIndex = startIndex + effectivePageSize;
+    const paginatedDocs = allGroupedDocs.slice(startIndex, endIndex);
+
     return {
       success: true,
-      documents: Array.from(groupedDocs.values()),
+      documents: paginatedDocs,
+      pagination: {
+        page,
+        pageSize: effectivePageSize,
+        totalDocuments,
+        totalPages,
+        hasMore: page < totalPages,
+      },
     };
   } catch (error) {
     console.error("Error getting documents:", error);
     return {
       success: false,
       documents: [],
+      pagination: {
+        page: 1,
+        pageSize: knowledgeConfig.pagination.defaultPageSize,
+        totalDocuments: 0,
+        totalPages: 0,
+        hasMore: false,
+      },
       error: error instanceof Error ? error.message : "Failed to get documents",
     };
   }
