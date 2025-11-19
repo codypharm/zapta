@@ -244,25 +244,14 @@ export async function getTopSearchQueries(
   limit: number = 10
 ) {
   const supabase = await createServerClient();
-  
+
   try {
-    const startDate = new Date();
-    startDate.setDate(startDate.getDate() - daysBack);
-    
-    let query = supabase
-      .from('search_analytics')
-      .select('query, COUNT(*) as count, AVG(top_similarity_score) as avg_score')
-      .eq('tenant_id', tenantId)
-      .gte('created_at', startDate.toISOString())
-      .gt('results_count', 0) // Only successful searches
-      .order('count', { ascending: false })
-      .limit(limit);
-
-    if (agentId) {
-      query = query.eq('agent_id', agentId);
-    }
-
-    const { data, error } = await query;
+    const { data, error } = await supabase.rpc('get_top_search_queries', {
+      filter_tenant_id: tenantId,
+      filter_agent_id: agentId || null,
+      days_back: daysBack,
+      limit_count: limit,
+    });
 
     if (error) {
       console.error('Failed to get top search queries:', error);

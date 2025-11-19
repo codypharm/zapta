@@ -12,6 +12,7 @@ import { createOpenAI } from "@ai-sdk/openai";
 import { createGoogleGenerativeAI } from "@ai-sdk/google";
 import { searchDocuments } from "@/lib/knowledge/actions";
 import { trackContextUsage } from "@/lib/knowledge/analytics";
+import { knowledgeConfig } from "@/lib/knowledge/config";
 
 interface Message {
   role: "user" | "assistant";
@@ -33,7 +34,14 @@ interface SearchDocument {
  */
 async function getRAGContext(tenantId: string, agentId: string, message: string, userSession?: string) {
   try {
-    const result = await searchDocuments(tenantId, message, agentId, 3, 0.7, userSession);
+    const result = await searchDocuments(
+      tenantId,
+      message,
+      agentId,
+      knowledgeConfig.rag.contextLimit,
+      knowledgeConfig.rag.contextThreshold,
+      userSession
+    );
     
     if (result.success && result.documents.length > 0) {
       // Track context usage for analytics
@@ -125,13 +133,13 @@ export async function sendMessage(
 
     const { data: metrics } = await supabase
       .from("usage_metrics")
-      .select("count")
+      .select("value")
       .eq("tenant_id", profile.tenant_id)
       .eq("metric_type", "messages")
       .gte("date", startOfMonth.toISOString().split('T')[0]);
 
     // Sum all message counts for the month
-    const totalMessages = metrics?.reduce((sum, m) => sum + (m.count || 0), 0) || 0;
+    const totalMessages = metrics?.reduce((sum, m) => sum + (m.value || 0), 0) || 0;
 
     if (totalMessages >= 100) {
       return {
@@ -293,24 +301,24 @@ async function logUsage(
     // Try to increment existing metric, or create new one
     const { data: existing } = await supabase
       .from('usage_metrics')
-      .select('id, count')
+      .select('id, value')
       .eq('tenant_id', tenantId)
       .eq('metric_type', 'messages')
       .eq('date', today)
       .maybeSingle();
 
     if (existing) {
-      // Update existing count
+      // Update existing value
       await supabase
         .from('usage_metrics')
-        .update({ count: existing.count + 1 })
+        .update({ value: existing.value + 1 })
         .eq('id', existing.id);
     } else {
       // Create new record
       await supabase.from('usage_metrics').insert({
         tenant_id: tenantId,
         metric_type: 'messages',
-        count: 1,
+        value: 1,
         date: today,
       });
     }
