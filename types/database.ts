@@ -59,12 +59,15 @@ export interface Database {
           id: string;
           tenant_id: string;
           provider: string;
+          type: 'email' | 'slack' | 'crm' | 'sms' | 'webhook' | 'calendar' | 'payment' | 'communication' | 'storage' | 'productivity' | 'development';
           credentials: Json;
           config: Json | null;
           status: 'connected' | 'disconnected' | 'error';
+          webhook_url: string | null;
           created_at: string;
+          updated_at: string | null;
         };
-        Insert: Omit<Database['public']['Tables']['integrations']['Row'], 'id' | 'created_at'>;
+        Insert: Omit<Database['public']['Tables']['integrations']['Row'], 'id' | 'created_at' | 'updated_at'>;
         Update: Partial<Database['public']['Tables']['integrations']['Insert']>;
       };
       conversations: {
