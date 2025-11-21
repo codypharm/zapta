@@ -206,11 +206,13 @@ export async function updateIntegration(
     if (data.webhook_url !== undefined)
       updateData.webhook_url = data.webhook_url;
 
-    const { error } = await supabase
+    const { data: integration, error } = await supabase
       .from("integrations")
       .update(updateData)
       .eq("id", id)
-      .eq("tenant_id", profile.tenant_id);
+      .eq("tenant_id", profile.tenant_id)
+      .select()
+      .single();
 
     if (error) {
       console.error("Integration update error:", error);
@@ -218,7 +220,7 @@ export async function updateIntegration(
     }
 
     revalidatePath("/integrations");
-    return { success: true };
+    return { success: true, integration };
   } catch (error) {
     console.error("Integration update error:", error);
     return { error: "An unexpected error occurred" };
@@ -341,14 +343,27 @@ export async function getAvailableProviders() {
     {
       id: "email",
       name: "Email",
-      description: "Send and receive emails, configure custom email addresses",
+      description: "Platform-wide email service - send and receive emails with zero setup",
       type: "email",
       icon: "📧",
       features: [
         "Inbound emails",
         "Outbound emails",
-        "Custom domains",
         "Auto-responses",
+        "Usage tracking",
+      ],
+    },
+    {
+      id: "hubspot",
+      name: "HubSpot",
+      description: "Sync contacts and deals with HubSpot CRM",
+      type: "crm",
+      icon: "🎯",
+      features: [
+        "Contact sync",
+        "Deal creation",
+        "Company sync",
+        "OAuth 2.0",
       ],
     },
     {
@@ -366,19 +381,6 @@ export async function getAvailableProviders() {
       ],
     },
     {
-      id: "hubspot",
-      name: "HubSpot",
-      description: "Sync contacts and deals with HubSpot CRM",
-      type: "crm",
-      icon: "🎯",
-      features: [
-        "Contact sync",
-        "Deal creation",
-        "Company sync",
-        "Ticket integration",
-      ],
-    },
-    {
       id: "webhook",
       name: "Webhook",
       description: "Connect to any service via custom webhooks",
@@ -389,97 +391,6 @@ export async function getAvailableProviders() {
         "Event filtering",
         "Payload transformation",
         "Retry logic",
-      ],
-    },
-    {
-      id: "twilio",
-      name: "Twilio SMS",
-      description: "Send and receive SMS messages via Twilio",
-      type: "sms",
-      icon: "📱",
-      features: [
-        "SMS sending",
-        "SMS receiving",
-        "Number management",
-        "Message templates",
-      ],
-    },
-    {
-      id: "google_calendar",
-      name: "Google Calendar",
-      description: "Create and manage calendar events",
-      type: "calendar",
-      icon: "📅",
-      features: [
-        "Event creation",
-        "Availability checking",
-        "Meeting scheduling",
-        "Calendar sync",
-      ],
-    },
-    {
-      id: "stripe",
-      name: "Stripe",
-      description: "Process payments and manage subscriptions",
-      type: "payment",
-      icon: "💳",
-      features: [
-        "Payment processing",
-        "Subscription management",
-        "Invoice creation",
-        "Webhook events",
-      ],
-    },
-    {
-      id: "discord",
-      name: "Discord",
-      description: "Connect to Discord servers and channels",
-      type: "communication",
-      icon: "🎮",
-      features: [
-        "Bot commands",
-        "Channel posting",
-        "DM responses",
-        "Server management",
-      ],
-    },
-    {
-      id: "google_drive",
-      name: "Google Drive",
-      description: "Access and manage files in Google Drive",
-      type: "storage",
-      icon: "📁",
-      features: [
-        "File upload/download",
-        "Document sharing",
-        "Folder management",
-        "Search capabilities",
-      ],
-    },
-    {
-      id: "notion",
-      name: "Notion",
-      description: "Create and manage Notion databases and pages",
-      type: "productivity",
-      icon: "📝",
-      features: [
-        "Database operations",
-        "Page creation",
-        "Block management",
-        "Content sync",
-      ],
-    },
-    {
-      id: "github",
-      name: "GitHub",
-      description: "Manage repositories and automate workflows",
-      type: "development",
-      icon: "🐙",
-      features: [
-        "Repository management",
-        "Issue tracking",
-        "Pull requests",
-        "Actions automation",
       ],
     },
   ];

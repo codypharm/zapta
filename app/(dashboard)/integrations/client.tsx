@@ -43,6 +43,7 @@ export function IntegrationsClient({
   const [selectedProvider, setSelectedProvider] = useState<
     (typeof availableProviders)[0] | null
   >(null);
+  const [selectedIntegration, setSelectedIntegration] = useState<Integration | null>(null);
 
   // Group integrations by type
   const integrationsByType = integrations.reduce(
@@ -70,6 +71,7 @@ export function IntegrationsClient({
     setIntegrations((prev) => [...prev, newIntegration]);
     setIsDialogOpen(false);
     setSelectedProvider(null);
+    setSelectedIntegration(null);
   };
 
   const handleIntegrationUpdated = (updatedIntegration: Integration) => {
@@ -80,6 +82,9 @@ export function IntegrationsClient({
           : integration
       )
     );
+    setIsDialogOpen(false);
+    setSelectedProvider(null);
+    setSelectedIntegration(null);
   };
 
   const handleIntegrationDeleted = (integrationId: string) => {
@@ -88,72 +93,91 @@ export function IntegrationsClient({
     );
   };
 
+  const handleConfigure = (integration: Integration) => {
+    const provider = availableProviders.find(
+      (p) => p.id === integration.provider
+    );
+    if (provider) {
+      setSelectedProvider(provider);
+      setSelectedIntegration(integration);
+      setIsDialogOpen(true);
+    }
+  };
+
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
+      {/* Professional Header */}
+      <div className="relative overflow-hidden rounded-lg bg-gradient-to-r from-slate-800 to-slate-700 p-8 shadow-sm">
+        <div className="relative z-10">
+          <h1 className="text-3xl font-bold text-white">Integrations</h1>
+          <p className="mt-2 text-slate-300">
+            Connect your AI agents to external services and platforms
+          </p>
+        </div>
+      </div>
+
       <Tabs defaultValue="all" className="w-full">
-        <TabsList>
-          <TabsTrigger value="all">All Integrations</TabsTrigger>
-          <TabsTrigger value="email">Email</TabsTrigger>
-          <TabsTrigger value="slack">Slack</TabsTrigger>
-          <TabsTrigger value="crm">CRM</TabsTrigger>
-          <TabsTrigger value="webhook">Webhooks</TabsTrigger>
-          <TabsTrigger value="sms">SMS</TabsTrigger>
-          <TabsTrigger value="calendar">Calendar</TabsTrigger>
-          <TabsTrigger value="payment">Payment</TabsTrigger>
-          <TabsTrigger value="communication">Communication</TabsTrigger>
-          <TabsTrigger value="storage">Storage</TabsTrigger>
-          <TabsTrigger value="productivity">Productivity</TabsTrigger>
-          <TabsTrigger value="development">Development</TabsTrigger>
+        <TabsList className="mb-6">
+          <TabsTrigger value="all">📊 All</TabsTrigger>
+          <TabsTrigger value="email">📧 Email</TabsTrigger>
+          <TabsTrigger value="crm">🎯 CRM</TabsTrigger>
+          <TabsTrigger value="slack">💬 Slack</TabsTrigger>
+          <TabsTrigger value="webhook">🔗 Webhooks</TabsTrigger>
         </TabsList>
 
         <TabsContent value="all" className="space-y-6">
           <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+            {/* Show existing integrations */}
+            {integrations.map((integration) => (
+              <IntegrationCard
+                key={integration.id}
+                integration={integration}
+                onUpdate={handleIntegrationUpdated}
+                onDelete={handleIntegrationDeleted}
+                onConfigure={handleConfigure}
+              />
+            ))}
+
+            {/* Show available providers to connect */}
             {availableProviders.map((provider) => {
               const hasIntegration = integrations.some(
-                (i) => i.type === provider.type
+                (i) => i.provider === provider.id
               );
 
+              // Skip if already connected
+              if (hasIntegration) return null;
+
               return (
-                <Card key={provider.id} className="relative">
+                <Card
+                  key={`new-${provider.id}`}
+                  className="group cursor-pointer border-2 border-dashed transition-all hover:border-primary  hover:shadow-lg"
+                >
                   <CardHeader>
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center space-x-2">
-                        <span className="text-2xl">{provider.icon}</span>
-                        <CardTitle className="text-lg">
+                    <div className="flex items-center space-x-3">
+                      <div className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-xl bg-slate-50 text-2xl transition-transform group-hover:scale-110">
+                        {provider.icon}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <CardTitle className="text-base font-semibold">
                           {provider.name}
                         </CardTitle>
+                        <p className="text-xs text-muted-foreground line-clamp-1">
+                          {provider.description}
+                        </p>
                       </div>
-                      {hasIntegration && (
-                        <Badge variant="secondary">Connected</Badge>
-                      )}
                     </div>
-                    <CardDescription>{provider.description}</CardDescription>
                   </CardHeader>
                   <CardContent>
-                    <div className="space-y-4">
-                      <div className="flex flex-wrap gap-1">
-                        {provider.features.map((feature) => (
-                          <Badge
-                            key={feature}
-                            variant="outline"
-                            className="text-xs"
-                          >
-                            {feature}
-                          </Badge>
-                        ))}
-                      </div>
-
-                      <Button
-                        className="w-full"
-                        variant={hasIntegration ? "outline" : "default"}
-                        onClick={() => {
-                          setSelectedProvider(provider);
-                          setIsDialogOpen(true);
-                        }}
-                      >
-                        {hasIntegration ? "Configure" : "Connect"}
-                      </Button>
-                    </div>
+                    <Button
+                      className="w-full"
+                      variant="outline"
+                      onClick={() => {
+                        setSelectedProvider(provider);
+                        setIsDialogOpen(true);
+                      }}
+                    >
+                      + Connect
+                    </Button>
                   </CardContent>
                 </Card>
               );
@@ -184,17 +208,24 @@ export function IntegrationsClient({
                 integration={integration}
                 onUpdate={handleIntegrationUpdated}
                 onDelete={handleIntegrationDeleted}
+                onConfigure={handleConfigure}
               />
             ))}
 
             {getAvailableProviders("email").map((provider) => (
-              <Card key={`new-${provider.id}`} className="border-dashed">
+              <Card key={`new-${provider.id}`} className="group cursor-pointer border-2 border-dashed transition-all hover:border-primary  hover:shadow-lg">
                 <CardHeader>
-                  <div className="flex items-center space-x-2">
-                    <span className="text-2xl">{provider.icon}</span>
-                    <CardTitle className="text-lg">{provider.name}</CardTitle>
+                  <div className="flex items-center space-x-3">
+                    <div className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-xl bg-slate-50 text-2xl transition-transform group-hover:scale-110">
+                      {provider.icon}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <CardTitle className="text-base font-semibold">{provider.name}</CardTitle>
+                      <p className="text-xs text-muted-foreground line-clamp-1">
+                        {provider.description}
+                      </p>
+                    </div>
                   </div>
-                  <CardDescription>{provider.description}</CardDescription>
                 </CardHeader>
                 <CardContent>
                   <Button
@@ -205,7 +236,7 @@ export function IntegrationsClient({
                       setIsDialogOpen(true);
                     }}
                   >
-                    Connect {provider.name}
+                    + Connect
                   </Button>
                 </CardContent>
               </Card>
@@ -235,11 +266,12 @@ export function IntegrationsClient({
                 integration={integration}
                 onUpdate={handleIntegrationUpdated}
                 onDelete={handleIntegrationDeleted}
+                onConfigure={handleConfigure}
               />
             ))}
 
             {getAvailableProviders("slack").map((provider) => (
-              <Card key={`new-${provider.id}`} className="border-dashed">
+              <Card key={`new-${provider.id}`} className="group cursor-pointer border-2 border-dashed transition-all hover:border-primary  hover:shadow-lg">
                 <CardHeader>
                   <div className="flex items-center space-x-2">
                     <span className="text-2xl">{provider.icon}</span>
@@ -286,11 +318,12 @@ export function IntegrationsClient({
                 integration={integration}
                 onUpdate={handleIntegrationUpdated}
                 onDelete={handleIntegrationDeleted}
+                onConfigure={handleConfigure}
               />
             ))}
 
             {getAvailableProviders("crm").map((provider) => (
-              <Card key={`new-${provider.id}`} className="border-dashed">
+              <Card key={`new-${provider.id}`} className="group cursor-pointer border-2 border-dashed transition-all hover:border-primary  hover:shadow-lg">
                 <CardHeader>
                   <div className="flex items-center space-x-2">
                     <span className="text-2xl">{provider.icon}</span>
@@ -337,11 +370,12 @@ export function IntegrationsClient({
                 integration={integration}
                 onUpdate={handleIntegrationUpdated}
                 onDelete={handleIntegrationDeleted}
+                onConfigure={handleConfigure}
               />
             ))}
 
             {getAvailableProviders("webhook").map((provider) => (
-              <Card key={`new-${provider.id}`} className="border-dashed">
+              <Card key={`new-${provider.id}`} className="group cursor-pointer border-2 border-dashed transition-all hover:border-primary  hover:shadow-lg">
                 <CardHeader>
                   <div className="flex items-center space-x-2">
                     <span className="text-2xl">{provider.icon}</span>
@@ -388,11 +422,12 @@ export function IntegrationsClient({
                 integration={integration}
                 onUpdate={handleIntegrationUpdated}
                 onDelete={handleIntegrationDeleted}
+                onConfigure={handleConfigure}
               />
             ))}
 
             {getAvailableProviders("sms").map((provider) => (
-              <Card key={`new-${provider.id}`} className="border-dashed">
+              <Card key={`new-${provider.id}`} className="group cursor-pointer border-2 border-dashed transition-all hover:border-primary  hover:shadow-lg">
                 <CardHeader>
                   <div className="flex items-center space-x-2">
                     <span className="text-2xl">{provider.icon}</span>
@@ -439,11 +474,12 @@ export function IntegrationsClient({
                 integration={integration}
                 onUpdate={handleIntegrationUpdated}
                 onDelete={handleIntegrationDeleted}
+                onConfigure={handleConfigure}
               />
             ))}
 
             {getAvailableProviders("calendar").map((provider) => (
-              <Card key={`new-${provider.id}`} className="border-dashed">
+              <Card key={`new-${provider.id}`} className="group cursor-pointer border-2 border-dashed transition-all hover:border-primary  hover:shadow-lg">
                 <CardHeader>
                   <div className="flex items-center space-x-2">
                     <span className="text-2xl">{provider.icon}</span>
@@ -490,11 +526,12 @@ export function IntegrationsClient({
                 integration={integration}
                 onUpdate={handleIntegrationUpdated}
                 onDelete={handleIntegrationDeleted}
+                onConfigure={handleConfigure}
               />
             ))}
 
             {getAvailableProviders("payment").map((provider) => (
-              <Card key={`new-${provider.id}`} className="border-dashed">
+              <Card key={`new-${provider.id}`} className="group cursor-pointer border-2 border-dashed transition-all hover:border-primary  hover:shadow-lg">
                 <CardHeader>
                   <div className="flex items-center space-x-2">
                     <span className="text-2xl">{provider.icon}</span>
@@ -545,11 +582,12 @@ export function IntegrationsClient({
                 integration={integration}
                 onUpdate={handleIntegrationUpdated}
                 onDelete={handleIntegrationDeleted}
+                onConfigure={handleConfigure}
               />
             ))}
 
             {getAvailableProviders("communication").map((provider) => (
-              <Card key={`new-${provider.id}`} className="border-dashed">
+              <Card key={`new-${provider.id}`} className="group cursor-pointer border-2 border-dashed transition-all hover:border-primary  hover:shadow-lg">
                 <CardHeader>
                   <div className="flex items-center space-x-2">
                     <span className="text-2xl">{provider.icon}</span>
@@ -596,11 +634,12 @@ export function IntegrationsClient({
                 integration={integration}
                 onUpdate={handleIntegrationUpdated}
                 onDelete={handleIntegrationDeleted}
+                onConfigure={handleConfigure}
               />
             ))}
 
             {getAvailableProviders("storage").map((provider) => (
-              <Card key={`new-${provider.id}`} className="border-dashed">
+              <Card key={`new-${provider.id}`} className="group cursor-pointer border-2 border-dashed transition-all hover:border-primary  hover:shadow-lg">
                 <CardHeader>
                   <div className="flex items-center space-x-2">
                     <span className="text-2xl">{provider.icon}</span>
@@ -647,11 +686,12 @@ export function IntegrationsClient({
                 integration={integration}
                 onUpdate={handleIntegrationUpdated}
                 onDelete={handleIntegrationDeleted}
+                onConfigure={handleConfigure}
               />
             ))}
 
             {getAvailableProviders("productivity").map((provider) => (
-              <Card key={`new-${provider.id}`} className="border-dashed">
+              <Card key={`new-${provider.id}`} className="group cursor-pointer border-2 border-dashed transition-all hover:border-primary  hover:shadow-lg">
                 <CardHeader>
                   <div className="flex items-center space-x-2">
                     <span className="text-2xl">{provider.icon}</span>
@@ -698,11 +738,12 @@ export function IntegrationsClient({
                 integration={integration}
                 onUpdate={handleIntegrationUpdated}
                 onDelete={handleIntegrationDeleted}
+                onConfigure={handleConfigure}
               />
             ))}
 
             {getAvailableProviders("development").map((provider) => (
-              <Card key={`new-${provider.id}`} className="border-dashed">
+              <Card key={`new-${provider.id}`} className="group cursor-pointer border-2 border-dashed transition-all hover:border-primary  hover:shadow-lg">
                 <CardHeader>
                   <div className="flex items-center space-x-2">
                     <span className="text-2xl">{provider.icon}</span>
@@ -734,9 +775,12 @@ export function IntegrationsClient({
           onClose={() => {
             setIsDialogOpen(false);
             setSelectedProvider(null);
+            setSelectedIntegration(null);
           }}
           provider={selectedProvider}
+          existingIntegration={selectedIntegration || undefined}
           onIntegrationCreated={handleIntegrationCreated}
+          onIntegrationUpdated={handleIntegrationUpdated}
         />
       )}
     </div>

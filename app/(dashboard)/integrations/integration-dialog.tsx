@@ -5,15 +5,16 @@
 
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
-import { createIntegration, testIntegration } from "@/lib/integrations/actions";
+import { createIntegration, updateIntegration, testIntegration } from "@/lib/integrations/actions";
 import { useToast } from "@/hooks/use-toast";
+import type { Integration } from "@/lib/integrations/base";
 import {
   AlertDialog,
   AlertDialogContent,
@@ -36,14 +37,18 @@ interface IntegrationDialogProps {
     icon: string;
     features: string[];
   };
+  existingIntegration?: Integration; // For edit mode
   onIntegrationCreated: (integration: any) => void;
+  onIntegrationUpdated?: (integration: any) => void;
 }
 
 export function IntegrationDialog({
   isOpen,
   onClose,
   provider,
+  existingIntegration,
   onIntegrationCreated,
+  onIntegrationUpdated,
 }: IntegrationDialogProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [isTesting, setIsTesting] = useState(false);
@@ -52,8 +57,33 @@ export function IntegrationDialog({
   const [webhookUrl, setWebhookUrl] = useState("");
   const { toast } = useToast();
 
+  const isEditMode = !!existingIntegration;
+
+  // Pre-fill form when editing
+  useEffect(() => {
+    if (existingIntegration) {
+      setCredentials(existingIntegration.credentials || {});
+      setConfig(existingIntegration.config || {});
+      setWebhookUrl(existingIntegration.webhook_url || "");
+    } else {
+      // Reset form when creating new
+      setCredentials({});
+      setConfig({});
+      setWebhookUrl("");
+    }
+  }, [existingIntegration, isOpen]);
+
+  // Form field type
+  interface FormField {
+    key: string;
+    label: string;
+    type: string;
+    required: boolean;
+    placeholder?: string;
+  }
+
   // Get form fields based on provider type
-  const getFormFields = () => {
+  const getFormFields = (): FormField[] => {
     switch (provider.type) {
       case "email":
         return [
@@ -316,27 +346,50 @@ export function IntegrationDialog({
     setIsLoading(true);
 
     try {
-      const result = await createIntegration({
-        provider: provider.id,
-        type: provider.type,
-        credentials,
-        config,
-        webhook_url: webhookUrl || undefined,
-      });
+      if (isEditMode && existingIntegration) {
+        // Update existing integration
+        const result = await updateIntegration(existingIntegration.id, {
+          credentials,
+          config,
+          webhook_url: webhookUrl || undefined,
+        });
 
-      if (result.error) {
-        throw new Error(result.error);
+        if (result.error) {
+          throw new Error(result.error);
+        }
+
+        toast({
+          title: "Integration Updated",
+          description: `Successfully updated ${provider.name}`,
+        });
+
+        onIntegrationUpdated?.(result.integration);
+      } else {
+        // Create new integration
+        const result = await createIntegration({
+          provider: provider.id,
+          type: provider.type,
+          credentials,
+          config,
+          webhook_url: webhookUrl || undefined,
+        });
+
+        if (result.error) {
+          throw new Error(result.error);
+        }
+
+        toast({
+          title: "Integration Created",
+          description: `Successfully connected to ${provider.name}`,
+        });
+
+        onIntegrationCreated(result.integration);
       }
-
-      toast({
-        title: "Integration Created",
-        description: `Successfully connected to ${provider.name}`,
-      });
-
-      onIntegrationCreated(result.integration);
+      
+      onClose();
     } catch (error) {
       toast({
-        title: "Failed to Create Integration",
+        title: isEditMode ? "Failed to Update Integration" : "Failed to Create Integration",
         description:
           error instanceof Error ? error.message : "An error occurred",
         variant: "destructive",
@@ -354,7 +407,9 @@ export function IntegrationDialog({
         <AlertDialogHeader>
           <div className="flex items-center space-x-2">
             <span className="text-2xl">{provider.icon}</span>
-            <AlertDialogTitle>Connect to {provider.name}</AlertDialogTitle>
+            <AlertDialogTitle>
+              {isEditMode ? `Configure ${provider.name}` : `Connect to ${provider.name}`}
+            </AlertDialogTitle>
           </div>
           <AlertDialogDescription>
             {provider.description}
@@ -384,7 +439,7 @@ export function IntegrationDialog({
               {field.type === "textarea" ? (
                 <Textarea
                   id={field.key}
-                  placeholder={`Enter ${field.label.toLowerCase()}`}
+                  placeholder={field.placeholder || `Enter ${field.label.toLowerCase()}`}
                   value={credentials[field.key] || ""}
                   onChange={(e) =>
                     setCredentials((prev) => ({
@@ -398,7 +453,7 @@ export function IntegrationDialog({
                 <Input
                   id={field.key}
                   type="password"
-                  placeholder={`Enter ${field.label.toLowerCase()}`}
+                  placeholder={field.placeholder || `Enter ${field.label.toLowerCase()}`}
                   value={credentials[field.key] || ""}
                   onChange={(e) =>
                     setCredentials((prev) => ({
@@ -412,7 +467,7 @@ export function IntegrationDialog({
                 <Input
                   id={field.key}
                   type="number"
-                  placeholder={`Enter ${field.label.toLowerCase()}`}
+                  placeholder={field.placeholder || `Enter ${field.label.toLowerCase()}`}
                   value={credentials[field.key] || ""}
                   onChange={(e) =>
                     setCredentials((prev) => ({
@@ -426,7 +481,7 @@ export function IntegrationDialog({
                 <Input
                   id={field.key}
                   type={field.type}
-                  placeholder={`Enter ${field.label.toLowerCase()}`}
+                  placeholder={field.placeholder || `Enter ${field.label.toLowerCase()}`}
                   value={credentials[field.key] || ""}
                   onChange={(e) =>
                     setCredentials((prev) => ({
@@ -471,10 +526,12 @@ export function IntegrationDialog({
             </Button>
 
             <div className="space-x-2">
-              <AlertDialogAction onClick={onClose}>Cancel</AlertDialogAction>
-              <AlertDialogAction type="submit" disabled={isLoading}>
-                {isLoading ? "Creating..." : "Create Integration"}
-              </AlertDialogAction>
+              <Button type="button" variant="outline" onClick={onClose}>
+                Cancel
+              </Button>
+              <Button type="submit" disabled={isLoading}>
+                {isLoading ? (isEditMode ? "Updating..." : "Creating...") : (isEditMode ? "Update Integration" : "Create Integration")}
+              </Button>
             </div>
           </div>
         </form>

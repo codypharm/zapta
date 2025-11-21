@@ -38,16 +38,18 @@ interface IntegrationCardProps {
   integration: Integration;
   onUpdate: (integration: Integration) => void;
   onDelete: (integrationId: string) => void;
+  onConfigure?: (integration: Integration) => void;
 }
 
 export function IntegrationCard({
   integration,
   onUpdate,
   onDelete,
+  onConfigure,
 }: IntegrationCardProps) {
   const [isTesting, setIsTesting] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
-  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const { toast } = useToast();
 
   const getProviderIcon = (provider: string) => {
@@ -109,10 +111,10 @@ export function IntegrationCard({
       }
 
       toast({
-        title: "Integration Deleted",
-        description: `${getProviderName(integration.provider)} has been removed`,
+        title: "Success",
+        description: "Integration deleted successfully",
       });
-
+      setDeleteDialogOpen(false);
       onDelete(integration.id);
     } catch (error) {
       toast({
@@ -125,53 +127,69 @@ export function IntegrationCard({
       });
     } finally {
       setIsDeleting(false);
-      setShowDeleteDialog(false);
     }
   };
 
   return (
-    <Card className="relative">
+    <Card className="group relative overflow-hidden transition-shadow duration-300 hover:shadow-lg">
+      {/* Status Indicator Dot */}
+      <div className="absolute right-4 top-4 z-10">
+        <div
+          className={`h-3 w-3 rounded-full ring-2 ring-white ${
+            integration.status === "connected"
+              ? "bg-green-500 shadow-lg shadow-green-500/50"
+              : "bg-red-500 shadow-lg shadow-red-500/50"
+          }`}
+        />
+      </div>
+
+      {/* Subtle Accent Bar */}
+      <div className="absolute left-0 top-0 h-1 w-full bg-gradient-to-r from-slate-400 to-slate-500" />
+
       <CardHeader>
-        <div className="flex items-center justify-between">
-          <div className="flex items-center space-x-2">
-            <span className="text-2xl">
-              {getProviderIcon(integration.provider)}
-            </span>
-            <CardTitle className="text-lg">
+        <div className="flex items-start space-x-4">
+          {/* Icon with Subtle Background */}
+          <div className="flex h-14 w-14 flex-shrink-0 items-center justify-center rounded-xl bg-slate-50 text-3xl shadow-sm transition-transform group-hover:scale-110">
+            {getProviderIcon(integration.provider)}
+          </div>
+
+          {/* Title and Description */}
+          <div className="flex-1 min-w-0">
+            <CardTitle className="text-xl font-bold">
               {getProviderName(integration.provider)}
             </CardTitle>
+            <CardDescription className="mt-1 text-sm">
+              Connected on {new Date(integration.created_at).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
+            </CardDescription>
           </div>
-          <Badge
-            variant={
-              integration.status === "connected" ? "default" : "destructive"
-            }
-          >
-            {integration.status}
-          </Badge>
         </div>
-        <CardDescription>
-          Connected on {new Date(integration.created_at).toLocaleDateString()}
-        </CardDescription>
       </CardHeader>
       <CardContent>
         <div className="space-y-4">
           {/* Integration details */}
-          <div className="space-y-2">
-            <div className="text-sm">
-              <span className="font-medium">Type:</span> {integration.type}
-            </div>
-            {integration.webhook_url && (
+          {integration.webhook_url && (
+            <div className="rounded-lg border bg-white p-3">
               <div className="text-sm">
-                <span className="font-medium">Webhook:</span>
-                <span className="ml-1 text-muted-foreground truncate block">
+                <span className="font-medium text-muted-foreground">Webhook URL:</span>
+                <p className="mt-1 truncate rounded bg-slate-50 px-2 py-1 font-mono text-xs">
                   {integration.webhook_url}
-                </span>
+                </p>
               </div>
-            )}
-          </div>
+            </div>
+          )}
 
           {/* Actions */}
           <div className="flex justify-end space-x-2">
+            {onConfigure && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => onConfigure(integration)}
+              >
+                Configure
+              </Button>
+            )}
+            
             <Button
               variant="outline"
               size="sm"
@@ -181,18 +199,17 @@ export function IntegrationCard({
               {isTesting ? "Testing..." : "Test"}
             </Button>
 
-            <AlertDialog>
-              <AlertDialogTrigger asChild>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  disabled={isDeleting}
-                  onClick={() => setShowDeleteDialog(true)}
-                >
-                  {isDeleting ? "Deleting..." : "Delete"}
-                </Button>
-              </AlertDialogTrigger>
+            <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={isDeleting}
+                onClick={() => setDeleteDialogOpen(true)}
+              >
+                {isDeleting ? "Deleting..." : "Delete"}
+              </Button>
               <AlertDialogContent>
+
                 <AlertDialogHeader>
                   <AlertDialogTitle>Delete Integration</AlertDialogTitle>
                   <AlertDialogDescription>
@@ -203,7 +220,7 @@ export function IntegrationCard({
                   </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>
-                  <AlertDialogCancel onClick={() => setShowDeleteDialog(false)}>
+                  <AlertDialogCancel onClick={() => setDeleteDialogOpen(false)}>
                     Cancel
                   </AlertDialogCancel>
                   <AlertDialogAction onClick={handleDelete}>
