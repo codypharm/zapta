@@ -237,27 +237,28 @@ export class GoogleCalendarIntegration extends BaseIntegration {
   async executeAction(action: string, params: any): Promise<any> {
     switch (action) {
       case 'create_event':
-        return this.createEvent(params.event, params.calendarId);
+        return this.createEvent(params.event, params.calendarId, params.agent_id);
       
       case 'update_event':
-        return this.updateEvent(params.eventId, params.event, params.calendarId);
+        return this.updateEvent(params.eventId, params.event, params.calendarId, params.agent_id);
       
       case 'delete_event':
-        return this.deleteEvent(params.eventId, params.calendarId);
+        return this.deleteEvent(params.eventId, params.calendarId, params.agent_id);
       
       case 'get_events':
       case 'list_events':
-        return this.listEvents(params.calendarId, params.maxResults);
+        return this.listEvents(params.calendarId, params.maxResults, params.agent_id);
       
       case 'check_availability':
-        return this.checkAvailability(params.timeMin, params.timeMax, params.calendarId);
+        return this.checkAvailability(params.calendarId, params.timeMin, params.timeMax, params.agent_id);
       
       case 'find_available_slots':
         return this.findAvailableSlots(
           new Date(params.startDate),
           new Date(params.endDate),
           params.durationMinutes,
-          params.calendarId
+          params.calendarId,
+          params.agent_id
         );
       
       default:
@@ -286,13 +287,85 @@ export class GoogleCalendarIntegration extends BaseIntegration {
   }
 
   /**
+   * Track calendar usage for analytics and rate limiting
+   */
+  private async trackCalendarUsage(usage: {
+    action_type: string;
+    event_id?: string;
+    event_title?: string;
+    event_start?: Date;
+    event_end?: Date;
+    attendee_email?: string;
+    google_event_id?: string;
+    calendar_id?: string;
+    agent_id?: string;
+    status: 'success' | 'failed';
+    error_message?: string;
+  }): Promise<void> {
+    try {
+      const { createClient } = await import('@supabase/supabase-js');
+      const supabase = createClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.SUPABASE_SERVICE_ROLE_KEY!
+      );
+
+      await supabase.from('calendar_usage').insert({
+        tenant_id: this.getTenantId(),
+        integration_id: this.integrationRecord?.id || '',
+        agent_id: usage.agent_id || null,
+        action_type: usage.action_type,
+        event_id: usage.event_id,
+        event_title: usage.event_title,
+        event_start: usage.event_start?.toISOString(),
+        event_end: usage.event_end?.toISOString(),
+        attendee_email: usage.attendee_email,
+        google_event_id: usage.google_event_id,
+        calendar_id: usage.calendar_id,
+        status: usage.status,
+        error_message: usage.error_message,
+      });
+    } catch (error) {
+      // Don't fail the action if tracking fails
+      console.error('Failed to track calendar usage:', error);
+    }
+  }
+
+  /**
    * Create a calendar event
    */
-  async createEvent(event: GoogleCalendarEvent, calendarId: string = 'primary'): Promise<any> {
-    return this.makeCalendarRequest(`/calendars/${calendarId}/events`, {
-      method: 'POST',
-      body: JSON.stringify(event),
-    });
+  async createEvent(event: GoogleCalendarEvent, calendarId: string = 'primary', agentId?: string): Promise<any> {
+    try {
+      const result = await this.makeCalendarRequest<any>(`/calendars/${calendarId}/events`, {
+        method: 'POST',
+        body: JSON.stringify(event),
+      });
+
+      // Track successful creation
+      await this.trackCalendarUsage({
+        action_type: 'create_event',
+        event_title: event.summary,
+        event_start: event.start?.dateTime ? new Date(event.start.dateTime) : undefined,
+        event_end: event.end?.dateTime ? new Date(event.end.dateTime) : undefined,
+        attendee_email: event.attendees?.[0]?.email,
+        google_event_id: result.id,
+        calendar_id: calendarId,
+        agent_id: agentId,
+        status: 'success',
+      });
+
+      return result;
+    } catch (error) {
+      // Track failed creation
+      await this.trackCalendarUsage({
+        action_type: 'create_event',
+        event_title: event.summary,
+        calendar_id: calendarId,
+        agent_id: agentId,
+        status: 'failed',
+        error_message: error instanceof Error ? error.message : 'Unknown error',
+      });
+      throw error;
+    }
   }
 
   /**
@@ -300,7 +373,8 @@ export class GoogleCalendarIntegration extends BaseIntegration {
    */
   async listEvents(
     calendarId: string = 'primary',
-    maxResults: number = 10
+    maxResults: number = 10,
+    agentId?: string
   ): Promise<any> {
     const params = new URLSearchParams({
       maxResults: maxResults.toString(),
@@ -309,25 +383,74 @@ export class GoogleCalendarIntegration extends BaseIntegration {
       timeMin: new Date().toISOString(),
     });
 
-    return this.makeCalendarRequest(`/calendars/${calendarId}/events?${params.toString()}`);
+    try {
+      const result = await this.makeCalendarRequest(`/calendars/${calendarId}/events?${params.toString()}`);
+
+      // Track successful list
+      await this.trackCalendarUsage({
+        action_type: 'list_events',
+        calendar_id: calendarId,
+        agent_id: agentId,
+        status: 'success',
+      });
+
+      return result;
+    } catch (error) {
+      // Track failed list
+      await this.trackCalendarUsage({
+        action_type: 'list_events',
+        calendar_id: calendarId,
+        agent_id: agentId,
+        status: 'failed',
+        error_message: error instanceof Error ? error.message : 'Unknown error',
+      });
+      throw error;
+    }
   }
 
   /**
    * Check availability (free/busy)
    */
   async checkAvailability(
+    calendarId: string = 'primary',
     timeMin: string,
     timeMax: string,
-    calendarId: string = 'primary'
+    agentId?: string
   ): Promise<any> {
-    return this.makeCalendarRequest('/freeBusy', {
-      method: 'POST',
-      body: JSON.stringify({
-        timeMin,
-        timeMax,
-        items: [{ id: calendarId }],
-      }),
-    });
+    try {
+      const result = await this.makeCalendarRequest('/freeBusy', {
+        method: 'POST',
+        body: JSON.stringify({
+          timeMin,
+          timeMax,
+          items: [{ id: calendarId }],
+        }),
+      });
+
+      // Track successful availability check
+      await this.trackCalendarUsage({
+        action_type: 'check_availability',
+        event_start: new Date(timeMin),
+        event_end: new Date(timeMax),
+        calendar_id: calendarId,
+        agent_id: agentId,
+        status: 'success',
+      });
+
+      return result;
+    } catch (error) {
+      // Track failed availability check
+      await this.trackCalendarUsage({
+        action_type: 'check_availability',
+        event_start: new Date(timeMin),
+        event_end: new Date(timeMax),
+        calendar_id: calendarId,
+        agent_id: agentId,
+        status: 'failed',
+        error_message: error instanceof Error ? error.message : 'Unknown error',
+      });
+      throw error;
+    }
   }
 
   /**
@@ -336,21 +459,73 @@ export class GoogleCalendarIntegration extends BaseIntegration {
   async updateEvent(
     eventId: string,
     event: Partial<GoogleCalendarEvent>,
-    calendarId: string = 'primary'
+    calendarId: string = 'primary',
+    agentId?: string
   ): Promise<any> {
-    return this.makeCalendarRequest(`/calendars/${calendarId}/events/${eventId}`, {
-      method: 'PATCH',
-      body: JSON.stringify(event),
-    });
+    try {
+      const result: any = await this.makeCalendarRequest(`/calendars/${calendarId}/events/${eventId}`, {
+        method: 'PATCH',
+        body: JSON.stringify(event),
+      });
+
+      // Track successful update
+      await this.trackCalendarUsage({
+        action_type: 'update_event',
+        event_id: eventId,
+        event_title: event.summary,
+        google_event_id: result.id,
+        calendar_id: calendarId,
+        agent_id: agentId,
+        status: 'success',
+      });
+
+      return result;
+    } catch (error) {
+      // Track failed update
+      await this.trackCalendarUsage({
+        action_type: 'update_event',
+        event_id: eventId,
+        calendar_id: calendarId,
+        agent_id: agentId,
+        status: 'failed',
+        error_message: error instanceof Error ? error.message : 'Unknown error',
+      });
+      throw error;
+    }
   }
 
   /**
    * Delete an event
    */
-  async deleteEvent(eventId: string, calendarId: string = 'primary'): Promise<void> {
-    await this.makeCalendarRequest(`/calendars/${calendarId}/events/${eventId}`, {
-      method: 'DELETE',
-    });
+  async deleteEvent(eventId: string, calendarId: string = 'primary', agentId?: string): Promise<void> {
+    try {
+      await this.makeCalendarRequest(`/calendars/${calendarId}/events/${eventId}`, {
+        method: 'DELETE',
+      });
+
+      // Track successful deletion
+      await this.trackCalendarUsage({
+        action_type: 'delete_event',
+        event_id: eventId,
+        google_event_id: eventId,
+        calendar_id: calendarId,
+        agent_id: agentId,
+        status: 'success',
+      });
+
+      // Return type is void, so no explicit return value needed for success
+    } catch (error) {
+      // Track failed deletion
+      await this.trackCalendarUsage({
+        action_type: 'delete_event',
+        event_id: eventId,
+        calendar_id: calendarId,
+        agent_id: agentId,
+        status: 'failed',
+        error_message: error instanceof Error ? error.message : 'Unknown error',
+      });
+      throw error;
+    }
   }
 
   /**
@@ -360,42 +535,68 @@ export class GoogleCalendarIntegration extends BaseIntegration {
     startDate: Date,
     endDate: Date,
     durationMinutes: number,
-    calendarId: string = 'primary'
+    calendarId: string = 'primary',
+    agentId?: string
   ): Promise<Array<{ start: string; end: string }>> {
-    const freeBusy = await this.checkAvailability(
-      startDate.toISOString(),
-      endDate.toISOString(),
-      calendarId
-    );
+    try {
+      const freeBusy = await this.checkAvailability(
+        calendarId,
+        startDate.toISOString(),
+        endDate.toISOString(),
+        agentId
+      );
 
-    const busyTimes = freeBusy.calendars[calendarId]?.busy || [];
-    const slots: Array<{ start: string; end: string }> = [];
+      const busyTimes = freeBusy.calendars[calendarId]?.busy || [];
+      const slots: Array<{ start: string; end: string }> = [];
 
-    // Simple algorithm to find free slots
-    let currentTime = new Date(startDate);
-    const endTime = new Date(endDate);
+      // Simple algorithm to find free slots
+      let currentTime = new Date(startDate);
+      const endTime = new Date(endDate);
 
-    while (currentTime < endTime) {
-      const slotEnd = new Date(currentTime.getTime() + durationMinutes * 60000);
+      while (currentTime < endTime) {
+        const slotEnd = new Date(currentTime.getTime() + durationMinutes * 60000);
 
-      // Check if this slot overlaps with any busy time
-      const isFree = !busyTimes.some((busy: any) => {
-        const busyStart = new Date(busy.start);
-        const busyEnd = new Date(busy.end);
-        return currentTime < busyEnd && slotEnd > busyStart;
-      });
-
-      if (isFree && slotEnd <= endTime) {
-        slots.push({
-          start: currentTime.toISOString(),
-          end: slotEnd.toISOString(),
+        // Check if this slot overlaps with any busy time
+        const isFree = !busyTimes.some((busy: any) => {
+          const busyStart = new Date(busy.start);
+          const busyEnd = new Date(busy.end);
+          return currentTime < busyEnd && slotEnd > busyStart;
         });
+
+        if (isFree && slotEnd <= endTime) {
+          slots.push({
+            start: currentTime.toISOString(),
+            end: slotEnd.toISOString(),
+          });
+        }
+
+        // Move to next 30-minute slot
+        currentTime = new Date(currentTime.getTime() + 30 * 60000);
       }
 
-      // Move to next 30-minute slot
-      currentTime = new Date(currentTime.getTime() + 30 * 60000);
-    }
+      // Track successful find available slots
+      await this.trackCalendarUsage({
+        action_type: 'find_available_slots',
+        event_start: startDate,
+        event_end: endDate,
+        calendar_id: calendarId,
+        agent_id: agentId,
+        status: 'success',
+      });
 
-    return slots;
+      return slots;
+    } catch (error) {
+      // Track failed find available slots
+      await this.trackCalendarUsage({
+        action_type: 'find_available_slots',
+        event_start: startDate,
+        event_end: endDate,
+        calendar_id: calendarId,
+        agent_id: agentId,
+        status: 'failed',
+        error_message: error instanceof Error ? error.message : 'Unknown error',
+      });
+      throw error;
+    }
   }
 }

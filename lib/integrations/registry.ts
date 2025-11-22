@@ -7,6 +7,7 @@ import { createServerClient } from "@/lib/supabase/server";
 import { EmailIntegration } from "./email";
 import { HubSpotIntegration } from "./hubspot";
 import { GoogleCalendarIntegration } from "./google-calendar";
+import { TwilioIntegration } from "./twilio";
 import type { Integration, IntegrationClass } from "./base";
 
 /**
@@ -144,6 +145,9 @@ function createIntegrationInstance(
 
       case "google_calendar":
         return new GoogleCalendarIntegration(decryptedIntegration);
+
+      case "twilio":
+        return new TwilioIntegration(decryptedIntegration);
 
       // TODO: Add more integrations as they're implemented
       // case "slack":

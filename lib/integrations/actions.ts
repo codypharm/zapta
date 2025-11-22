@@ -385,14 +385,14 @@ export async function getAvailableProviders() {
     {
       id: "twilio",
       name: "Twilio SMS",
-      description: "Send SMS notifications, reminders, and alerts to customers",
+      description: "Send SMS notifications with zero setup - platform-wide service included",
       type: "sms",
       icon: "📱",
       features: [
-        "SMS sending",
+        "Platform SMS included",
         "Two-way messaging",
         "Delivery tracking",
-        "Template support",
+        "Custom credentials optional",
       ],
     },
     {

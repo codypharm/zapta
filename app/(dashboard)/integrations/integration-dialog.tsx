@@ -80,6 +80,7 @@ export function IntegrationDialog({
     type: string;
     required: boolean;
     placeholder?: string;
+    description?: string;
   }
 
   // Get form fields based on provider type
@@ -145,21 +146,27 @@ export function IntegrationDialog({
         return [
           {
             key: "account_sid",
-            label: "Account SID",
+            label: "Custom Account SID (Optional)",
             type: "text",
-            required: true,
+            required: false,
+            placeholder: "ACxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+            description: "Leave empty to use platform SMS service",
           },
           {
             key: "auth_token",
-            label: "Auth Token",
+            label: "Custom Auth Token (Optional)",
             type: "password",
-            required: true,
+            required: false,
+            placeholder: "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+            description: "Leave empty to use platform SMS service",
           },
           {
             key: "from_number",
-            label: "From Number",
+            label: "Custom From Number (Optional)",
             type: "text",
-            required: true,
+            required: false,
+            placeholder: "+15551234567",
+            description: "Leave empty to use platform SMS. If provided, must be a phone number purchased from Twilio and registered to your account (E.164 format)",
           },
         ];
       case "crm":
@@ -462,7 +469,12 @@ export function IntegrationDialog({
                 {field.label}
                 {field.required && <span className="text-red-500 ml-1">*</span>}
               </Label>
-              {field.type === "textarea" ? (
+              {field.description && (
+                <p className="text-sm text-muted-foreground mt-1 mb-2">
+                  {field.description}
+                </p>
+              )}
+              {field.type === "email" ? (
                 <Textarea
                   id={field.key}
                   placeholder={field.placeholder || `Enter ${field.label.toLowerCase()}`}
