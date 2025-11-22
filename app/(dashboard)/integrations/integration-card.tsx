@@ -77,19 +77,34 @@ export function IntegrationCard({
   };
 
   const handleTestConnection = async () => {
+    console.log('[TEST] Starting connection test for:', integration.provider);
     setIsTesting(true);
     try {
       const result = await testIntegration(integration.id);
+      console.log('[TEST] Test result:', result);
 
       if (result.error) {
         throw new Error(result.error);
       }
 
-      toast({
-        title: "Connection Test Successful",
-        description: `${getProviderName(integration.provider)} is working correctly`,
-      });
+      // Handle both boolean and object results
+      if (typeof result === 'object' && result.success !== undefined) {
+        console.log('[TEST] Showing toast - success:', result.success);
+        toast({
+          title: result.success ? "Connection Successful" : "Connection Failed",
+          description: result.message || (result.success ? `${getProviderName(integration.provider)} is working correctly` : "Failed to connect"),
+          variant: result.success ? "default" : "destructive",
+        });
+      } else {
+        console.log('[TEST] Showing fallback toast');
+        // Fallback for boolean results
+        toast({
+          title: "Connection Successful",
+          description: `${getProviderName(integration.provider)} is working correctly`,
+        });
+      }
     } catch (error) {
+      console.error('[TEST] Error during test:', error);
       toast({
         title: "Connection Test Failed",
         description:
@@ -97,6 +112,7 @@ export function IntegrationCard({
         variant: "destructive",
       });
     } finally {
+      console.log('[TEST] Test complete, resetting button');
       setIsTesting(false);
     }
   };
@@ -220,11 +236,11 @@ export function IntegrationCard({
                   </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>
-                  <AlertDialogCancel onClick={() => setDeleteDialogOpen(false)}>
+                  <AlertDialogCancel onClick={() => setDeleteDialogOpen(false)} disabled={isDeleting}>
                     Cancel
                   </AlertDialogCancel>
-                  <AlertDialogAction onClick={handleDelete}>
-                    Delete Integration
+                  <AlertDialogAction onClick={handleDelete} disabled={isDeleting}>
+                    {isDeleting ? "Deleting..." : "Delete Integration"}
                   </AlertDialogAction>
                 </AlertDialogFooter>
               </AlertDialogContent>

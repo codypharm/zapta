@@ -128,12 +128,28 @@ export class EmailIntegration extends BaseIntegration {
     try {
       const credentials = this.getCredentials() as EmailCredentials;
       
-      // Simple validation - check API key format
-      if (credentials.api_key && credentials.api_key.startsWith("re_")) {
-        return true;
+      // Check if from_email is configured
+      if (!credentials.from_email) {
+        console.error('Email test failed: from_email not configured');
+        return false;
       }
       
-      return false;
+      // Check if we have a valid API key (custom or platform)
+      const apiKey = credentials.api_key || process.env.RESEND_API_KEY;
+      
+      if (!apiKey) {
+        console.error('Email test failed: No API key available');
+        return false;
+      }
+      
+      // Validate API key format
+      if (!apiKey.startsWith("re_")) {
+        console.error('Email test failed: Invalid API key format');
+        return false;
+      }
+      
+      console.log('[EMAIL] Connection test passed');
+      return true;
     } catch (error) {
       console.error("Email connection test failed:", error);
       return false;

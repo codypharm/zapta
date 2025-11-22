@@ -120,6 +120,9 @@ export function IntegrationsClient({
         <TabsList className="mb-6">
           <TabsTrigger value="all">📊 All</TabsTrigger>
           <TabsTrigger value="email">📧 Email</TabsTrigger>
+          <TabsTrigger value="calendar">📅 Calendar</TabsTrigger>
+          <TabsTrigger value="payment">💳 Payment</TabsTrigger>
+          <TabsTrigger value="sms">📱 SMS</TabsTrigger>
           <TabsTrigger value="crm">🎯 CRM</TabsTrigger>
           <TabsTrigger value="slack">💬 Slack</TabsTrigger>
           <TabsTrigger value="webhook">🔗 Webhooks</TabsTrigger>

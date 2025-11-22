@@ -6,6 +6,7 @@
 import { createServerClient } from "@/lib/supabase/server";
 import { EmailIntegration } from "./email";
 import { HubSpotIntegration } from "./hubspot";
+import { GoogleCalendarIntegration } from "./google-calendar";
 import type { Integration, IntegrationClass } from "./base";
 
 /**
@@ -119,12 +120,30 @@ function createIntegrationInstance(
   integration: IntegrationRecord
 ): IntegrationClass | null {
   try {
+    // Decrypt credentials before passing to integration
+    const { safeDecryptCredentials } = require('./encryption');
+    const decryptedIntegration = {
+      ...integration,
+      credentials: integration.credentials 
+        ? safeDecryptCredentials(integration.credentials) 
+        : {}
+    };
+    
+    console.log('[REGISTRY] Creating integration instance:', {
+      provider: integration.provider,
+      has_encrypted_creds: !!integration.credentials,
+      has_decrypted_creds: !!decryptedIntegration.credentials
+    });
+
     switch (integration.provider) {
       case "email":
-        return new EmailIntegration(integration);
+        return new EmailIntegration(decryptedIntegration);
 
       case "hubspot":
-        return new HubSpotIntegration(integration);
+        return new HubSpotIntegration(decryptedIntegration);
+
+      case "google_calendar":
+        return new GoogleCalendarIntegration(decryptedIntegration);
 
       // TODO: Add more integrations as they're implemented
       // case "slack":

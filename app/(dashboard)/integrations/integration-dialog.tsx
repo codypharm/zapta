@@ -184,26 +184,8 @@ export function IntegrationDialog({
           },
         ];
       case "calendar":
-        return [
-          {
-            key: "client_id",
-            label: "Client ID",
-            type: "text",
-            required: true,
-          },
-          {
-            key: "client_secret",
-            label: "Client Secret",
-            type: "password",
-            required: true,
-          },
-          {
-            key: "redirect_uri",
-            label: "Redirect URI",
-            type: "url",
-            required: true,
-          },
-        ];
+        // Calendar uses OAuth - no credential fields needed
+        return [];
       case "payment":
         return [
           {
@@ -402,21 +384,36 @@ export function IntegrationDialog({
   const formFields = getFormFields();
 
   return (
-    <AlertDialog open={isOpen}>
+    <AlertDialog open={isOpen} onOpenChange={onClose}>
       <AlertDialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
         <AlertDialogHeader>
-          <div className="flex items-center space-x-2">
-            <span className="text-2xl">{provider.icon}</span>
-            <AlertDialogTitle>
-              {isEditMode ? `Configure ${provider.name}` : `Connect to ${provider.name}`}
-            </AlertDialogTitle>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-2">
+              <span className="text-2xl">{provider.icon}</span>
+              <AlertDialogTitle>
+                {isEditMode ? `Configure ${provider.name}` : `Connect to ${provider.name}`}
+              </AlertDialogTitle>
+            </div>
+            {/* Close button for OAuth integrations */}
+            {formFields.length === 0 && (
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="h-6 w-6 p-0"
+                onClick={onClose}
+              >
+                <span className="sr-only">Close</span>
+                ✕
+              </Button>
+            )}
           </div>
           <AlertDialogDescription>
             {provider.description}
           </AlertDialogDescription>
         </AlertDialogHeader>
 
-        <form onSubmit={handleSubmit} className="space-y-6">
+        <form onSubmit={handleSubmit} className="space-y-6" id="integration-form">
           {/* Features */}
           <div>
             <Label className="text-sm font-medium">Features</Label>
@@ -429,7 +426,36 @@ export function IntegrationDialog({
             </div>
           </div>
 
-          {/* Form Fields */}
+          {/* OAuth Integration - Show Connect Button */}
+          {formFields.length === 0 && !isEditMode ? (
+            <div className="space-y-4">
+              <div className="rounded-lg border-2 border-dashed bg-slate-50 p-8 text-center">
+                <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-blue-50 text-3xl">
+                  {provider.icon}
+                </div>
+                <h4 className="mb-2 text-lg font-semibold text-gray-900">
+                  Connect to {provider.name}
+                </h4>
+                <p className="mb-6 text-sm text-gray-600">
+                  You'll be redirected to {provider.name} to securely authorize access.
+                </p>
+                <Button
+                  type="button"
+                  onClick={() => {
+                    // Use hyphen in URL to match API routes
+                    const routePath = provider.id.replace('_', '-');
+                    window.location.href = `/api/integrations/${routePath}/auth`;
+                  }}
+                  className="w-full max-w-sm"
+                  size="lg"
+                >
+                  Connect to {provider.name}
+                </Button>
+              </div>
+            </div>
+          ) : (
+            /* Form Fields */
+            <>
           {formFields.map((field) => (
             <div key={field.key} className="space-y-2">
               <Label htmlFor={field.key}>
@@ -494,6 +520,8 @@ export function IntegrationDialog({
               )}
             </div>
           ))}
+            </>
+          )}
 
           {/* Webhook URL (for integrations that support it) */}
           {(provider.type === "slack" ||
@@ -514,26 +542,32 @@ export function IntegrationDialog({
             </div>
           )}
 
-          {/* Actions */}
-          <div className="flex justify-between pt-4">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={handleTestConnection}
-              disabled={isTesting || isLoading}
-            >
-              {isTesting ? "Testing..." : "Test Connection"}
-            </Button>
-
-            <div className="space-x-2">
-              <Button type="button" variant="outline" onClick={onClose}>
-                Cancel
-              </Button>
-              <Button type="submit" disabled={isLoading}>
-                {isLoading ? (isEditMode ? "Updating..." : "Creating...") : (isEditMode ? "Update Integration" : "Create Integration")}
+          {/* Footer - Hide for OAuth integrations */}
+          {formFields.length > 0 && (
+            <div className="flex justify-end space-x-2 border-t pt-4 mt-6">
+              <AlertDialogCancel onClick={(e) => {
+                e.preventDefault();
+                onClose();  
+              }} className="h-9">Cancel</AlertDialogCancel>
+              {isEditMode && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={handleTestConnection}
+                  disabled={isTesting}
+                >
+                  {isTesting ? "Testing..." : "Test Connection"}
+                </Button>
+              )}
+              <Button type="submit" disabled={isLoading} form="integration-form">
+                {isLoading
+                  ? "Saving..."
+                  : isEditMode
+                  ? "Update Integration"
+                  : "Create Integration"}
               </Button>
             </div>
-          </div>
+          )}
         </form>
       </AlertDialogContent>
     </AlertDialog>

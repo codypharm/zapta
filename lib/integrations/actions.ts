@@ -311,24 +311,27 @@ export async function testIntegration(id: string) {
       return { error: "Integration not found" };
     }
 
-    // Import and test the specific integration
-    const integrationModule = await import(`./${integration.type}`);
-    const IntegrationClass =
-      integrationModule.default || integrationModule[integration.type];
-    const integrationInstance = new IntegrationClass();
+    // Use registry to get integration instance
+    const { getIntegrationInstance } = await import("./registry");
+    const integrationInstance = await getIntegrationInstance(id);
 
-    const isConnected = await integrationInstance.testConnection();
+    if (!integrationInstance) {
+      return { error: "Failed to create integration instance" };
+    }
 
-    // Update integration status
-    await supabase
-      .from("integrations")
-      .update({
-        status: isConnected ? "connected" : "error",
-        updated_at: new Date().toISOString(),
-      })
-      .eq("id", id);
+    // Test the connection
+    const result = await integrationInstance.testConnection();
 
-    return { success: isConnected };
+    // Ensure we always return a consistent object format
+    if (typeof result === 'object' && 'success' in result) {
+      return result;
+    } else {
+      // Handle boolean result from older integrations
+      return { 
+        success: !!result, 
+        message: result ? "Connection test successful" : "Connection test failed" 
+      };
+    }
   } catch (error) {
     console.error("Integration test error:", error);
     return { error: "Failed to test integration" };
@@ -351,6 +354,45 @@ export async function getAvailableProviders() {
         "Outbound emails",
         "Auto-responses",
         "Usage tracking",
+      ],
+    },
+    {
+      id: "google_calendar",
+      name: "Google Calendar",
+      description: "Schedule meetings and manage appointments automatically",
+      type: "calendar",
+      icon: "📅",
+      features: [
+        "Event creation",
+        "Availability check",
+        "Meeting scheduling",
+        "Calendar sync",
+      ],
+    },
+    {
+      id: "stripe",
+      name: "Stripe",
+      description: "Process payments, create invoices, and manage subscriptions",
+      type: "payment",
+      icon: "💳",
+      features: [
+        "Payment processing",
+        "Invoice creation",
+        "Subscription management",
+        "Refund handling",
+      ],
+    },
+    {
+      id: "twilio",
+      name: "Twilio SMS",
+      description: "Send SMS notifications, reminders, and alerts to customers",
+      type: "sms",
+      icon: "📱",
+      features: [
+        "SMS sending",
+        "Two-way messaging",
+        "Delivery tracking",
+        "Template support",
       ],
     },
     {

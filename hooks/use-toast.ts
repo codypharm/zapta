@@ -15,7 +15,7 @@ export interface ToastProps {
 export type ToastActionElement = React.ReactElement;
 
 const TOAST_LIMIT = 1;
-const TOAST_REMOVE_DELAY = 1000000;
+const TOAST_REMOVE_DELAY = 5000; // 5 seconds
 
 type ToasterToast = ToastProps & {
   id: string;
@@ -169,6 +169,9 @@ function toast({ ...props }: Toast) {
       },
     },
   });
+
+  // Auto-dismiss after TOAST_REMOVE_DELAY
+  addToRemoveQueue(id);
 
   return {
     id: id,
