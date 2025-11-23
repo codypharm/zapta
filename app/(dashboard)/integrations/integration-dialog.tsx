@@ -170,26 +170,8 @@ export function IntegrationDialog({
           },
         ];
       case "crm":
-        return [
-          {
-            key: "client_id",
-            label: "HubSpot Client ID",
-            type: "text",
-            required: true,
-          },
-          {
-            key: "client_secret",
-            label: "HubSpot Client Secret",
-            type: "password",
-            required: true,
-          },
-          {
-            key: "portal_id",
-            label: "Portal ID (Optional)",
-            type: "text",
-            required: false,
-          },
-        ];
+        // HubSpot uses OAuth - no form fields needed, it redirects to HubSpot
+        return [];
       case "calendar":
         // Calendar uses OAuth - no credential fields needed
         return [];
@@ -537,8 +519,7 @@ export function IntegrationDialog({
 
           {/* Webhook URL (for integrations that support it) */}
           {(provider.type === "slack" ||
-            provider.type === "webhook" ||
-            provider.type === "crm") && (
+            provider.type === "webhook") && (
             <div className="space-y-2">
               <Label htmlFor="webhook_url">Webhook URL</Label>
               <Input

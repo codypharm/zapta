@@ -196,7 +196,9 @@ export function IntegrationCard({
 
           {/* Actions */}
           <div className="flex justify-end space-x-2">
-            {onConfigure && (
+            {onConfigure && 
+             integration.provider !== 'hubspot' && 
+             integration.provider !== 'google_calendar' && (
               <Button
                 variant="outline"
                 size="sm"
