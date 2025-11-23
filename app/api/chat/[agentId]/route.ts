@@ -12,6 +12,10 @@ import { createOpenAI } from "@ai-sdk/openai";
 import { notifyTenantUsers } from "@/lib/notifications/email";
 import { searchDocuments } from "@/lib/knowledge/actions";
 import { trackSearchQuery, trackSearchHit, trackContextUsage } from "@/lib/knowledge/analytics";
+import {
+  triggerAgentCompletedEvent,
+  triggerAgentFailedEvent,
+} from "@/lib/webhooks/triggers";
 
 // Create Supabase client with service role (bypass RLS for public endpoint)
 const supabase = createClient(
@@ -118,6 +122,15 @@ export async function POST(
       { role: "assistant", content: text },
     ], leadId);
 
+    // Trigger webhook event for agent completion
+    await triggerAgentCompletedEvent(
+      agent.tenant_id,
+      agent.id,
+      agent.name,
+      { type: "chat" as const, message },
+      { message: text, actions: [] }
+    );
+
     // Return response with sources
     return NextResponse.json({
       message: text,
@@ -126,6 +139,29 @@ export async function POST(
     });
   } catch (error) {
     console.error("Widget chat error:", error);
+    
+    // Try to trigger failure webhook if we have agent context
+    try {
+      const {agentId} = await params;
+      const { data: agent } = await supabase
+        .from("agents")
+        .select("name, tenant_id")
+        .eq("id", agentId)
+        .single();
+        
+      if (agent) {
+        await triggerAgentFailedEvent(
+          agent.tenant_id,
+          agentId,
+          agent.name,
+          { type: "chat" as const },
+          (error as Error)?.message || "Unknown error"
+        );
+      }
+    } catch (webhookError) {
+      // Ignore webhook errors
+    }
+    
     return NextResponse.json(
       { error: "Failed to process message" },
       { status: 500 }

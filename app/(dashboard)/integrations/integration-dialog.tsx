@@ -128,18 +128,21 @@ export function IntegrationDialog({
         ];
       case "webhook":
         return [
-          { key: "url", label: "Webhook URL", type: "url", required: true },
           {
-            key: "secret",
-            label: "Secret (Optional)",
-            type: "password",
-            required: false,
+            key: "webhook_url",
+            label: "Webhook URL",
+            type: "url",
+            required: true,
+            placeholder: "https://your-domain.com/webhook",
+            description: "The URL where webhook events will be sent (Zapier, Make.com, custom API)"
           },
           {
-            key: "headers",
-            label: "Custom Headers (JSON)",
-            type: "textarea",
+            key: "webhook_secret",
+            label: "Webhook Secret (Optional)",
+            type: "password",
             required: false,
+            placeholder: "Optional secret for HMAC signature",
+            description: "If provided, webhooks will include X-Webhook-Signature header for verification"
           },
         ];
       case "sms":
@@ -517,9 +520,8 @@ export function IntegrationDialog({
             </>
           )}
 
-          {/* Webhook URL (for integrations that support it) */}
-          {(provider.type === "slack" ||
-            provider.type === "webhook") && (
+          {/* Webhook URL (for Slack - receives events FROM Slack) */}
+          {provider.type === "slack" && (
             <div className="space-y-2">
               <Label htmlFor="webhook_url">Webhook URL</Label>
               <Input

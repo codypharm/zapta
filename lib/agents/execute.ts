@@ -11,6 +11,10 @@ import { createGoogleGenerativeAI } from "@ai-sdk/google";
 import { createAnthropic } from "@ai-sdk/anthropic";
 import { createOpenAI } from "@ai-sdk/openai";
 import { getIntegrationMap } from "@/lib/integrations/registry";
+import {
+  triggerAgentCompletedEvent,
+  triggerAgentFailedEvent,
+} from "@/lib/webhooks/triggers";
 
 interface AgentInput {
   type: "chat" | "email" | "webhook" | "slack" | "sms";
@@ -39,10 +43,12 @@ export async function executeAgent(
   input: AgentInput
 ): Promise<AgentOutput> {
   const supabase = await createServerClient();
+  
+  let agent: any = null; // Declare outside try-catch for error handling
 
   try {
     // 1. Load agent configuration
-    const { data: agent, error: agentError } = await supabase
+    const { data: agentData, error: agentError } = await supabase
       .from("agents")
       .select(
         `
@@ -56,9 +62,11 @@ export async function executeAgent(
       .eq("id", agentId)
       .single();
 
-    if (agentError || !agent) {
+    if (agentError || !agentData) {
       throw new Error(`Agent not found: ${agentId}`);
     }
+    
+    agent = agentData; // Assign to outer variable
 
     // 2. Build context (conversation history, knowledge base)
     const context = await buildContext(agent, input);
@@ -101,6 +109,15 @@ export async function executeAgent(
       actions,
     });
 
+    // 8. Trigger webhook event for agent completion
+    await triggerAgentCompletedEvent(
+      agent.tenant_id,
+      agent.id,
+      agent.name,
+      input,
+      { message: text, actions }
+    );
+
     return {
       message: text,
       actions: actions || [],
@@ -109,13 +126,27 @@ export async function executeAgent(
     console.error("Agent execution error:", error);
 
     // Log error execution
+    const tenantId = agent?.tenant_id || "unknown";
+    const agentName = agent?.name || "Unknown Agent";
+    
     await logExecution(
       agentId,
-      "unknown",
+      tenantId,
       input,
       { message: "" },
       (error as Error)?.message || "Unknown error"
     );
+
+    // Trigger webhook event for agent failure
+    if (tenantId !== "unknown") {
+      await triggerAgentFailedEvent(
+        tenantId,
+        agentId,
+        agentName,
+        input,
+        (error as Error)?.message || "Unknown error"
+      );
+    }
 
     throw error;
   }

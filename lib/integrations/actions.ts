@@ -425,14 +425,14 @@ export async function getAvailableProviders() {
     {
       id: "webhook",
       name: "Webhook",
-      description: "Connect to any service via custom webhooks",
+      description: "Send events to any URL - Connect to Zapier, Make.com, or custom APIs",
       type: "webhook",
       icon: "🔗",
       features: [
+        "Universal connectivity",
+        "Zapier/Make integration",
+        "HMAC signatures",
         "Custom endpoints",
-        "Event filtering",
-        "Payload transformation",
-        "Retry logic",
       ],
     },
   ];

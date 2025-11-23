@@ -149,6 +149,10 @@ function createIntegrationInstance(
       case "twilio":
         return new TwilioIntegration(decryptedIntegration);
 
+      case "webhook":
+        const { WebhookIntegration } = require("./webhook");
+        return new WebhookIntegration(decryptedIntegration);
+
       // TODO: Add more integrations as they're implemented
       // case "slack":
       //   return new SlackIntegration(integration);

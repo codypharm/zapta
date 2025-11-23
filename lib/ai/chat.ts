@@ -13,6 +13,10 @@ import { createGoogleGenerativeAI } from "@ai-sdk/google";
 import { searchDocuments } from "@/lib/knowledge/actions";
 import { trackContextUsage } from "@/lib/knowledge/analytics";
 import { knowledgeConfig } from "@/lib/knowledge/config";
+import {
+  triggerAgentCompletedEvent,
+  triggerAgentFailedEvent,
+} from "@/lib/webhooks/triggers";
 
 interface Message {
   role: "user" | "assistant";
@@ -188,12 +192,43 @@ export async function sendMessage(
       usage?.outputTokens || 0
     );
 
+    // Trigger webhook event for agent completion
+    await triggerAgentCompletedEvent(
+      profile.tenant_id,
+      agentId,
+      agent.name,
+      { type: "chat" as const, message },
+      { message: text, actions: [] }
+    );
+
     return { 
       message: text,
       sources: ragContext.hasContext ? ragContext.sources : undefined
     };
   } catch (error) {
     console.error("AI chat error:", error);
+    
+    // Try to trigger failure webhook if we have agent context
+    try {
+      const { data: agent } = await supabase
+        .from("agents")
+        .select("name, tenant_id")
+        .eq("id", agentId)
+        .single();
+        
+      if (agent) {
+        await triggerAgentFailedEvent(
+          agent.tenant_id,
+          agentId,
+          agent.name,
+          { type: "chat" as const, message },
+          (error as Error)?.message || "Unknown error"
+        );
+      }
+    } catch (webhookError) {
+      // Ignore webhook errors
+    }
+    
     return { error: "Failed to get AI response. Please try again." };
   }
 }
