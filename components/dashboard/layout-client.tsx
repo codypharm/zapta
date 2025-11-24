@@ -83,15 +83,16 @@ export default function DashboardLayoutClient({
       >
         <div className="flex h-full flex-col">
           {/* Logo */}
-          <div className="flex h-16 items-center gap-2 px-6 border-b">
-            <Link href="/" className="flex items-center gap-2">
+          <div className="flex h-16 items-center gap-3 px-6 border-b">
+            <Link href="/" className="flex items-center gap-3">
               <Image 
                 src="/assets/logo.png" 
                 alt="Zapta" 
-                width={200} 
-                height={60}
-                className="h-14 w-auto"
+                width={56} 
+                height={56}
+                className="h-14 w-14"
               />
+              <span className="text-2xl font-bold">Zapta</span>
             </Link>
             <button
               onClick={() => setSidebarOpen(false)}
