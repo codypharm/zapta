@@ -57,7 +57,15 @@ export class GoogleCalendarIntegration extends BaseIntegration {
    */
   static getAuthorizationUrl(state: string): string {
     const clientId = process.env.GOOGLE_CLIENT_ID;
-    const redirectUri = process.env.GOOGLE_REDIRECT_URI;
+    
+    // Use explicit redirect URI if set, otherwise build from app URL
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL || 
+                   process.env.NEXT_PUBLIC_SITE_URL ||
+                   (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'http://localhost:3000');
+    
+    const redirectUri = process.env.GOOGLE_REDIRECT_URI || 
+                        `${appUrl}/api/integrations/google-calendar/callback`;
+    
     const scopes = [
       'https://www.googleapis.com/auth/calendar',
       'https://www.googleapis.com/auth/calendar.events',
@@ -65,7 +73,7 @@ export class GoogleCalendarIntegration extends BaseIntegration {
 
     const params = new URLSearchParams({
       client_id: clientId || '',
-      redirect_uri: redirectUri || '',
+      redirect_uri: redirectUri,
       response_type: 'code',
       scope: scopes.join(' '),
       access_type: 'offline', // Request refresh token
@@ -85,6 +93,14 @@ export class GoogleCalendarIntegration extends BaseIntegration {
     expires_in: number;
     token_type: string;
   }> {
+    // Use same redirect URI logic as authorization URL
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL || 
+                   process.env.NEXT_PUBLIC_SITE_URL ||
+                   (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'http://localhost:3000');
+    
+    const redirectUri = process.env.GOOGLE_REDIRECT_URI || 
+                        `${appUrl}/api/integrations/google-calendar/callback`;
+    
     const response = await fetch('https://oauth2.googleapis.com/token', {
       method: 'POST',
       headers: {
@@ -94,7 +110,7 @@ export class GoogleCalendarIntegration extends BaseIntegration {
         code,
         client_id: process.env.GOOGLE_CLIENT_ID || '',
         client_secret: process.env.GOOGLE_CLIENT_SECRET || '',
-        redirect_uri: process.env.GOOGLE_REDIRECT_URI || '',
+        redirect_uri: redirectUri,
         grant_type: 'authorization_code',
       }),
     });

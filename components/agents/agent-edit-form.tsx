@@ -1,12 +1,14 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Badge } from "@/components/ui/badge";
 import {
   Select,
   SelectContent,
@@ -15,7 +17,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { ArrowLeft, Save } from "lucide-react";
+import { ArrowLeft, Save, ExternalLink } from "lucide-react";
 import Link from "next/link";
 import { LeadCollectionSettings, type LeadCollectionConfig } from "@/components/agents/lead-collection-settings";
 
@@ -61,6 +63,11 @@ export function AgentEditForm({ agent }: AgentEditFormProps) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  
+  // Integration states
+  const [selectedIntegrations, setSelectedIntegrations] = useState<string[]>([]);
+  const [availableIntegrations, setAvailableIntegrations] = useState<any[]>([]);
+  const [loadingIntegrations, setLoadingIntegrations] = useState(true);
 
   // Form data initialized with agent values
   const [formData, setFormData] = useState<{
@@ -91,6 +98,38 @@ export function AgentEditForm({ agent }: AgentEditFormProps) {
     },
   });
 
+  // Load integrations on mount
+  useEffect(() => {
+    const loadData = async () => {
+      setLoadingIntegrations(true);
+      try {
+        // Load available integrations
+        const { getIntegrations } = await import("@/lib/integrations/actions");
+        const result = await getIntegrations();
+        if (result.integrations) {
+          setAvailableIntegrations(result.integrations.filter(i => i.status === "connected"));
+        }
+
+        // Load agent's current integrations
+        const { createClient } = await import("@/lib/supabase/client");
+        const supabase = createClient();
+        const { data: agentIntegrations } = await supabase
+          .from('agent_integrations')
+          .select('integration_id')
+          .eq('agent_id', agent.id);
+        
+        if (agentIntegrations) {
+          setSelectedIntegrations(agentIntegrations.map(ai => ai.integration_id));
+        }
+      } catch (err) {
+        console.error("Failed to load integrations:", err);
+      } finally {
+        setLoadingIntegrations(false);
+      }
+    };
+    loadData();
+  }, [agent.id]);
+
   const updateFormData = (field: string, value: string) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
     setError(null);
@@ -114,7 +153,10 @@ export function AgentEditForm({ agent }: AgentEditFormProps) {
 
     try {
       const { updateAgent } = await import("@/lib/agents/actions");
-      const result = await updateAgent(agent.id, formData);
+      const result = await updateAgent(agent.id, {
+        ...formData,
+        integration_ids: selectedIntegrations,
+      });
 
       if (result.error) {
         setError(result.error);
@@ -269,8 +311,80 @@ export function AgentEditForm({ agent }: AgentEditFormProps) {
                 config={formData.leadCollection}
                 onChange={(config) => setFormData((prev) => ({ ...prev, leadCollection: config }))}
               />
+            </CardContent>
+          </Card>
 
-              {/* Submit Button */}
+          {/* Integrations Section */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Integrations</CardTitle>
+              <CardDescription>
+                Select which integrations this agent can access
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {loadingIntegrations ? (
+                <p className="text-sm text-muted-foreground">Loading integrations...</p>
+              ) : availableIntegrations.length === 0 ? (
+                <Alert>
+                  <AlertDescription>
+                    <div className="space-y-2">
+                      <p>No integrations configured yet.</p>
+                      <Link 
+                        href="/integrations" 
+                        className="text-primary hover:underline inline-flex items-center gap-1"
+                      >
+                        Set up integrations <ExternalLink className="w-3 h-3" />
+                      </Link>
+                    </div>
+                  </AlertDescription>
+                </Alert>
+              ) : (
+                <div className="space-y-4">
+                  <p className="text-sm text-muted-foreground">
+                    Grant this agent access to specific integrations. It will only be able to use the ones you select.
+                  </p>
+                  <div className="space-y-3">
+                    {availableIntegrations.map((integration) => (
+                      <div key={integration.id} className="flex items-start space-x-3 p-3 rounded-lg border hover:bg-muted/50 transition-colors">
+                        <Checkbox
+                          id={`edit-${integration.id}`}
+                          checked={selectedIntegrations.includes(integration.id)}
+                          onCheckedChange={(checked) => {
+                            if (checked) {
+                              setSelectedIntegrations([...selectedIntegrations, integration.id]);
+                            } else {
+                              setSelectedIntegrations(
+                                selectedIntegrations.filter(id => id !== integration.id)
+                              );
+                            }
+                          }}
+                          className="mt-1"
+                        />
+                        <label htmlFor={`edit-${integration.id}`} className="flex-1 cursor-pointer">
+                          <div className="flex items-center gap-2 mb-1">
+                            <span className="font-medium capitalize">{integration.provider}</span>
+                            <Badge variant={integration.status === 'connected' ? 'default' : 'secondary'}>
+                              {integration.status}
+                            </Badge>
+                          </div>
+                          {integration.config?.webhook_url && (
+                            <p className="text-xs text-muted-foreground">
+                              {integration.config.webhook_url}
+                            </p>
+                          )}
+                        </label>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Submit Buttons */}
+          <Card>
+            <CardContent className="pt-6">
               <div className="flex gap-3 pt-4">
                 <Button type="submit" disabled={loading} className="flex-1">
                   {loading ? (

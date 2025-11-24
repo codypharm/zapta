@@ -41,12 +41,18 @@ export async function signup(formData: FormData) {
     .replace(/^-|-$/g, "");
 
   try {
+    // Get the proper app URL - prioritize production URL
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL || 
+                   process.env.NEXT_PUBLIC_SITE_URL ||
+                   (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 
+                   'http://localhost:3000');
+    
     // Step 1: Sign up user with Supabase Auth
     const { data: authData, error: authError } = await supabase.auth.signUp({
       email,
       password,
       options: {
-        emailRedirectTo: `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/auth/callback`,
+        emailRedirectTo: `${appUrl}/auth/callback`,
         data: {
           full_name: fullName,
         },

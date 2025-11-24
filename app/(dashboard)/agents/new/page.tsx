@@ -63,6 +63,8 @@ export default function CreateAgentPage() {
   const [currentStep, setCurrentStep] = useState(1);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [userPlan, setUserPlan] = useState<string>('free');
+  const [loadingPlan, setLoadingPlan] = useState(true);
 
   const [formData, setFormData] = useState<{
     name: string;
@@ -96,6 +98,42 @@ export default function CreateAgentPage() {
   const [selectedIntegrations, setSelectedIntegrations] = useState<string[]>([]);
   const [availableIntegrations, setAvailableIntegrations] = useState<any[]>([]);
   const [loadingIntegrations, setLoadingIntegrations] = useState(false);
+
+  // Fetch user plan
+  useEffect(() => {
+    const loadUserPlan = async () => {
+      try {
+        const { createClient } = await import("@/lib/supabase/client");
+        const supabase = createClient();
+        
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return;
+        
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('tenant_id')
+          .eq('user_id', user.id)
+          .single();
+        
+        if (profile) {
+          const { data: tenant } = await supabase
+            .from('tenants')
+            .select('subscription_plan')
+            .eq('id', profile.tenant_id)
+            .single();
+          
+          if (tenant) {
+            setUserPlan(tenant.subscription_plan || 'free');
+          }
+        }
+      } catch (err) {
+        console.error('Failed to load user plan:', err);
+      } finally {
+        setLoadingPlan(false);
+      }
+    };
+    loadUserPlan();
+  }, []);
 
   // Fetch available integrations on mount
   useEffect(() => {
@@ -338,18 +376,51 @@ Example: You are a helpful customer support agent. Your goal is to assist custom
                   <Select
                     value={formData.model}
                     onValueChange={(value) => updateFormData("model", value)}
+                    disabled={loadingPlan}
                   >
                     <SelectTrigger>
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      {AI_MODELS.map((model) => (
-                        <SelectItem key={model.value} value={model.value}>
-                          {model.label}
-                        </SelectItem>
-                      ))}
+                      {AI_MODELS.map((model) => {
+                        const { canUseModel } = require("@/lib/billing/plans");
+                        const isAllowed = canUseModel(userPlan, model.value);
+                        
+                        return (
+                          <SelectItem 
+                            key={model.value} 
+                            value={model.value}
+                            disabled={!isAllowed}
+                            className={!isAllowed ? "opacity-50 cursor-not-allowed" : ""}
+                          >
+                            <div className="flex items-center justify-between w-full">
+                              <span>{model.label}</span>
+                              {!isAllowed && (
+                                <Badge variant="outline" className="ml-2 text-xs">
+                                  Upgrade
+                                </Badge>
+                              )}
+                            </div>
+                          </SelectItem>
+                        );
+                      })}
                     </SelectContent>
                   </Select>
+                  {!loadingPlan && (
+                    <p className="text-xs text-muted-foreground">
+                      Your <span className="capitalize">{userPlan}</span> plan allows:{" "}
+                      {(() => {
+                        const { getPlanLimits } = require("@/lib/billing/plans");
+                        const limits = getPlanLimits(userPlan);
+                        if (limits.models === '*') return 'All models';
+                        return (limits.models as string[]).join(", ");
+                      })()}
+                      {" "}
+                      <Link href="/settings/billing" className="text-primary hover:underline">
+                        Upgrade plan
+                      </Link>
+                    </p>
+                  )}
                 </div>
 
                 <div className="space-y-2">
