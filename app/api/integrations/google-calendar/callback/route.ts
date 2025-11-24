@@ -5,6 +5,11 @@ import { encryptCredentials } from '@/lib/integrations/encryption';
 
 export async function GET(request: NextRequest) {
   try {
+    // Get the app base URL for redirects
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL || 
+                   process.env.NEXT_PUBLIC_SITE_URL ||
+                   (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'http://localhost:3000');
+    
     const searchParams = request.nextUrl.searchParams;
     const code = searchParams.get('code');
     const state = searchParams.get('state');
@@ -13,13 +18,13 @@ export async function GET(request: NextRequest) {
     // Handle OAuth errors
     if (error) {
       return NextResponse.redirect(
-        new URL(`/integrations?error=${encodeURIComponent(error)}`, request.url)
+        new URL(`/integrations?error=${encodeURIComponent(error)}`, appUrl)
       );
     }
 
     if (!code || !state) {
       return NextResponse.redirect(
-        new URL('/integrations?error=missing_code', request.url)
+        new URL('/integrations?error=missing_code', appUrl)
       );
     }
 
@@ -31,7 +36,7 @@ export async function GET(request: NextRequest) {
 
     if (!tenant_id) {
       return NextResponse.redirect(
-        new URL('/integrations?error=invalid_state', request.url)
+        new URL('/integrations?error=invalid_state', appUrl)
       );
     }
 
@@ -91,20 +96,26 @@ export async function GET(request: NextRequest) {
     if (dbError) {
       console.error('Failed to save integration:', dbError);
       return NextResponse.redirect(
-        new URL('/integrations?error=database_error', request.url)
+        new URL('/integrations?error=database_error', appUrl)
       );
     }
 
     // Redirect back to integrations page with success
     return NextResponse.redirect(
-      new URL('/integrations?success=google_calendar_connected', request.url)
+      new URL('/integrations?success=google_calendar_connected', appUrl)
     );
   } catch (error) {
     console.error('OAuth callback error:', error);
+    
+    // Get app URL for error redirect
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL || 
+                   process.env.NEXT_PUBLIC_SITE_URL ||
+                   (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'http://localhost:3000');
+    
     return NextResponse.redirect(
       new URL(
         `/integrations?error=${encodeURIComponent(error instanceof Error ? error.message : 'unknown_error')}`,
-        request.url
+        appUrl
       )
     );
   }
