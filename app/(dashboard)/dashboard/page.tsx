@@ -11,13 +11,13 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import Link from "next/link";
 import { getDashboardStats, getRecentActivity } from "@/lib/analytics/actions";
 import { ActivityFeed } from "@/components/dashboard/activity-feed";
-import { Bot, MessageSquare, Users, BarChart3 } from "lucide-react";
+import { Bot, MessageSquare, Users, BarChart3, Lightbulb } from "lucide-react";
+import { Suspense } from "react";
+import { LoadingStats, LoadingCard } from "@/components/ui/loading-state";
+import { UsageLimitBanner } from "@/components/billing/usage-limit-banner";
+import { checkMessageLimit } from "@/lib/billing/usage";
 
-export default async function DashboardPage({
-  searchParams,
-}: {
-  searchParams: Promise<{ verified?: string }>;
-}) {
+async function DashboardContent({ params }: { params: { verified?: string } }) {
   const supabase = await createServerClient();
 
   // Get current user
@@ -36,12 +36,23 @@ export default async function DashboardPage({
     .eq("id", user.id)
     .single();
 
-  // Await searchParams
-  const params = await searchParams;
+  // Check message usage limits
+  const tenantId = (profile as any)?.tenants?.id;
+  let messageUsage = null;
+  if (tenantId) {
+    messageUsage = await checkMessageLimit(tenantId);
+  }
 
-  // Fetch dashboard stats and recent activity
-  const { stats } = await getDashboardStats();
-  const { activities } = await getRecentActivity(8);
+  // Parallel data fetching for better performance
+  const [{ stats }, { activities }] = await Promise.all([
+    getDashboardStats(),
+    getRecentActivity(8)
+  ]);
+
+  // Check if user is new (no activity)
+  const isNewUser = (stats?.activeAgents || 0) === 0 && 
+                    (stats?.recentConversations || 0) === 0 && 
+                    (stats?.recentLeads || 0) === 0;
 
   return (
     <div className="p-8">
@@ -58,6 +69,15 @@ export default async function DashboardPage({
               </div>
             </AlertDescription>
           </Alert>
+        )}
+
+        {/* Usage Limit Banner */}
+        {messageUsage && (
+          <UsageLimitBanner
+            current={messageUsage.current}
+            limit={messageUsage.limit}
+            resourceType="messages"
+          />
         )}
 
         {/* Welcome section */}
@@ -80,6 +100,46 @@ export default async function DashboardPage({
             </Link>
           </Button>
         </div>
+
+        {/* New User Welcome Card */}
+        {isNewUser && (
+          <Card className="border-primary bg-primary/5">
+            <CardContent className="py-8">
+              <div className="text-center space-y-4">
+                <h3 className="text-xl font-bold">🎉 Welcome to Zapta!</h3>
+                <p className="text-muted-foreground max-w-lg mx-auto">
+                  Get started in 3 easy steps:
+                </p>
+                <div className="grid gap-4 md:grid-cols-3 mt-6">
+                  <div className="space-y-2">
+                    <div className="text-3xl">1️⃣</div>
+                    <h4 className="font-semibold">Create an Agent</h4>
+                    <p className="text-sm text-muted-foreground">
+                      Build your first AI agent in minutes
+                    </p>
+                  </div>
+                  <div className="space-y-2">
+                    <div className="text-3xl">2️⃣</div>
+                    <h4 className="font-semibold">Add Knowledge</h4>
+                    <p className="text-sm text-muted-foreground">
+                      Upload documents to help your agent answer questions
+                    </p>
+                  </div>
+                  <div className="space-y-2">
+                    <div className="text-3xl">3️⃣</div>
+                    <h4 className="font-semibold">Start Chatting</h4>
+                    <p className="text-sm text-muted-foreground">
+                      Test your agent and share with users
+                    </p>
+                  </div>
+                </div>
+                <Button asChild size="lg" className="mt-4">
+                  <Link href="/agents/new">Create Your First Agent →</Link>
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         {/* Quick stats */}
         <div className="grid gap-4 md:grid-cols-3">
@@ -135,30 +195,49 @@ export default async function DashboardPage({
 
         {/* Two column layout */}
         <div className="grid gap-6 lg:grid-cols-2">
-          {/* Recent Activity */}
-          <ActivityFeed activities={activities || []} />
+          {/* Recent Activity with Empty State */}
+          {activities && activities.length > 0 ? (
+            <ActivityFeed activities={activities} />
+          ) : (
+            <Card>
+              <CardHeader>
+                <CardTitle>Recent Activity</CardTitle>
+              </CardHeader>
+              <CardContent className="py-12">
+                <div className="text-center text-muted-foreground">
+                  <MessageSquare className="w-12 h-12 mx-auto mb-3 opacity-20" />
+                  <p className="font-medium">No activity yet</p>
+                  <p className="text-sm mt-1">
+                    Activity will appear here as you use your agents
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
+          )}
 
-          {/* Quick actions */}
+          {/* Quick actions with improved hierarchy */}
           <Card>
             <CardHeader>
               <CardTitle>Quick Actions</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="flex items-start gap-4 p-4 rounded-lg border hover:border-primary/50 transition-colors">
-                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10">
-                  <Bot className="w-5 h-5 text-primary" />
+              {/* Primary action - more prominent */}
+              <div className="flex items-start gap-4 p-4 rounded-lg bg-primary/10 border-2 border-primary/20">
+                <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg bg-primary">
+                  <Bot className="w-6 h-6 text-primary-foreground" />
                 </div>
                 <div className="flex-1 space-y-2">
-                  <h3 className="font-semibold">Create Agent</h3>
+                  <h3 className="font-bold">Create Agent</h3>
                   <p className="text-sm text-muted-foreground">
                     Build a new AI agent in minutes using natural language
                   </p>
-                  <Button asChild size="sm" className="mt-2">
-                    <Link href="/agents/new">Create Agent →</Link>
+                  <Button asChild size="lg" className="mt-2">
+                    <Link href="/agents/new">Get Started →</Link>
                   </Button>
                 </div>
               </div>
 
+              {/* Secondary actions */}
               <div className="flex items-start gap-4 p-4 rounded-lg border hover:border-primary/50 transition-colors">
                 <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-green-100">
                   <Users className="w-5 h-5 text-green-600" />
@@ -191,7 +270,56 @@ export default async function DashboardPage({
             </CardContent>
           </Card>
         </div>
+
+        {/* Tip of the Day - only show for non-new users */}
+        {!isNewUser && (
+          <Card className="border-blue-200 bg-blue-50/50 dark:bg-blue-950/20 dark:border-blue-900">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-base">
+                <Lightbulb className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+                💡 Tip of the Day
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-sm">
+                Did you know? You can connect your agents to HubSpot, 
+                send emails, schedule meetings, and more with integrations!
+              </p>
+              <Button asChild variant="link" className="px-0 mt-2">
+                <Link href="/integrations">Explore Integrations →</Link>
+              </Button>
+            </CardContent>
+          </Card>
+        )}
       </div>
     </div>
+  );
+}
+
+export default async function DashboardPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ verified?: string }>;
+}) {
+  const params = await searchParams;
+
+  return (
+    <Suspense fallback={
+      <div className="p-8">
+        <div className="mx-auto max-w-7xl space-y-8">
+          <div className="space-y-2">
+            <div className="h-10 w-64 bg-muted animate-pulse rounded" />
+            <div className="h-4 w-48 bg-muted animate-pulse rounded" />
+          </div>
+          <LoadingStats />
+          <div className="grid gap-6 lg:grid-cols-2">
+            <LoadingCard />
+            <LoadingCard />
+          </div>
+        </div>
+      </div>
+    }>
+      <DashboardContent params={params} />
+    </Suspense>
   );
 }

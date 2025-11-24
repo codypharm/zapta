@@ -5,13 +5,15 @@
 
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Badge } from "@/components/ui/badge";
 import {
   Select,
   SelectContent,
@@ -19,9 +21,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { ArrowLeft, ArrowRight, Check } from "lucide-react";
+import { ArrowLeft, ArrowRight, Check, ExternalLink } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { LeadCollectionSettings, type LeadCollectionConfig } from "@/components/agents/lead-collection-settings";
+import Link from "next/link";
 
 const AGENT_TYPES = [
   { value: "support", label: "Customer Support", description: "Handle customer inquiries and provide assistance" },
@@ -31,10 +34,20 @@ const AGENT_TYPES = [
 ];
 
 const AI_MODELS = [
-  { value: "gemini-2.5-flash", label: "Gemini 2.5 Flash (Free, Fast)" },
-  { value: "gemini-1.5-pro", label: "Gemini 2.5 Pro (Free, Smart)" },
-  { value: "claude-3-5-sonnet", label: "Claude 3.5 Sonnet" },
-  { value: "gpt-4", label: "GPT-4" },
+  // Gemini 3 (Latest - Best Overall)
+  { value: "gemini-3-pro", label: "Gemini 3 Pro ⭐ NEW" },
+  // Gemini 2.0
+  { value: "gemini-2.0-flash", label: "Gemini 2.0 Flash" },
+  { value: "gemini-2.0-flash-thinking", label: "Gemini 2.0 Flash Thinking" },
+  // Gemini 1.5
+  { value: "gemini-1.5-flash", label: "Gemini 1.5 Flash" },
+  { value: "gemini-1.5-flash-8b", label: "Gemini 1.5 Flash 8B" },
+  { value: "gemini-1.5-pro", label: "Gemini 1.5 Pro" },
+  // Claude 3.5
+  { value: "claude-3.5-sonnet", label: "Claude 3.5 Sonnet" },
+  { value: "claude-3.5-haiku", label: "Claude 3.5 Haiku" },
+  // OpenAI
+  { value: "gpt-4o", label: "GPT-4o" },
   { value: "gpt-3.5-turbo", label: "GPT-3.5 Turbo" },
 ];
 
@@ -51,7 +64,6 @@ export default function CreateAgentPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Form data
   const [formData, setFormData] = useState<{
     name: string;
     type: string;
@@ -79,6 +91,30 @@ export default function CreateAgentPage() {
       submitButtonText: "Start Chat",
     },
   });
+  
+  // Integration selection state
+  const [selectedIntegrations, setSelectedIntegrations] = useState<string[]>([]);
+  const [availableIntegrations, setAvailableIntegrations] = useState<any[]>([]);
+  const [loadingIntegrations, setLoadingIntegrations] = useState(false);
+
+  // Fetch available integrations on mount
+  useEffect(() => {
+    const loadIntegrations = async () => {
+      setLoadingIntegrations(true);
+      try {
+        const { getIntegrations } = await import("@/lib/integrations/actions");
+        const result = await getIntegrations();
+        if (result.integrations) {
+          setAvailableIntegrations(result.integrations.filter(i => i.status === "connected"));
+        }
+      } catch (err) {
+        console.error("Failed to load integrations:", err);
+      } finally {
+        setLoadingIntegrations(false);
+      }
+    };
+    loadIntegrations();
+  }, []);
 
   const updateFormData = (field: string, value: string) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
@@ -114,7 +150,7 @@ export default function CreateAgentPage() {
 
   const handleNext = () => {
     if (validateStep(currentStep)) {
-      setCurrentStep((prev) => Math.min(prev + 1, 3));
+      setCurrentStep((prev) => Math.min(prev + 1, 4)); // Now 4 steps
     }
   };
 
@@ -129,7 +165,10 @@ export default function CreateAgentPage() {
 
     try {
       const { createAgent } = await import("@/lib/agents/actions");
-      const result = await createAgent(formData);
+      const result = await createAgent({
+        ...formData,
+        integration_ids: selectedIntegrations, // Include selected integrations
+      });
 
       if (result.error) {
         setError(result.error);
@@ -165,7 +204,7 @@ export default function CreateAgentPage() {
 
         {/* Step Indicator */}
         <div className="flex items-center justify-between">
-          {[1, 2, 3].map((step) => (
+          {[1, 2, 3, 4].map((step) => (
             <div key={step} className="flex items-center flex-1">
               <div className="flex items-center">
                 <div
@@ -187,10 +226,10 @@ export default function CreateAgentPage() {
                     step <= currentStep ? "text-foreground" : "text-muted-foreground"
                   }`}
                 >
-                  {step === 1 ? "Basics" : step === 2 ? "Configure" : "Review"}
+                  {step === 1 ? "Basics" : step === 2 ? "Configure" : step === 3 ? "Integrations" : "Review"}
                 </span>
               </div>
-              {step < 3 && (
+              {step < 4 && (
                 <div
                   className={`flex-1 h-1 mx-4 ${
                     step < currentStep ? "bg-primary" : "bg-gray-200"
@@ -342,8 +381,83 @@ Example: You are a helpful customer support agent. Your goal is to assist custom
           </Card>
         )}
 
-        {/* Step 3: Review */}
+        {/* Step 3: Select Integrations */}
         {currentStep === 3 && (
+          <Card>
+            <CardHeader>
+              <CardTitle>Select Integrations</CardTitle>
+              <CardDescription>
+                Choose which integrations this agent can access
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {loadingIntegrations ? (
+                <div className="text-center py-8 text-muted-foreground">
+                  Loading integrations...
+                </div>
+              ) : availableIntegrations.length === 0 ? (
+                <Alert>
+                  <AlertDescription>
+                    <div className="space-y-2">
+                      <p>No integrations configured yet.</p>
+                      <Link 
+                        href="/integrations" 
+                        className="text-primary hover:underline inline-flex items-center gap-1"
+                      >
+                        Set up integrations <ExternalLink className="w-3 h-3" />
+                      </Link>
+                    </div>
+                  </AlertDescription>
+                </Alert>
+              ) : (
+                <div className="space-y-4">
+                  <p className="text-sm text-muted-foreground">
+                    Select which integrations this agent can use. Leave all unchecked if the agent doesn't need any integrations.
+                  </p>
+                  <div className="space-y-3">
+                    {availableIntegrations.map((integration) => (
+                      <div key={integration.id} className="flex items-start space-x-3 p-3 rounded-lg border hover:bg-muted/50 transition-colors">
+                        <Checkbox
+                          id={integration.id}
+                          checked={selectedIntegrations.includes(integration.id)}
+                          onCheckedChange={(checked) => {
+                            if (checked) {
+                              setSelectedIntegrations([...selectedIntegrations, integration.id]);
+                            } else {
+                              setSelectedIntegrations(
+                                selectedIntegrations.filter(id => id !== integration.id)
+                              );
+                            }
+                          }}
+                          className="mt-1"
+                        />
+                        <label htmlFor={integration.id} className="flex-1 cursor-pointer">
+                          <div className="flex items-center gap-2 mb-1">
+                            <span className="font-medium capitalize">{integration.provider}</span>
+                            <Badge variant={integration.status === 'connected' ? 'default' : 'secondary'}>
+                              {integration.status}
+                            </Badge>
+                          </div>
+                          {integration.config?.webhook_url && (
+                            <p className="text-xs text-muted-foreground">
+                              {integration.config.webhook_url}
+                            </p>
+                          )}
+                        </label>
+                      </div>
+                    ))}
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    💡 Tip: You can always edit integration access later from the agent's settings.
+                  </p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Step 4: Review */}
+        {currentStep === 4 && (
           <Card>
             <CardHeader>
               <CardTitle>Review & Deploy</CardTitle>
@@ -443,7 +557,7 @@ Example: You are a helpful customer support agent. Your goal is to assist custom
             Back
           </Button>
 
-          {currentStep < 3 ? (
+          {currentStep < 4 ? (
             <Button onClick={handleNext}>
               Next
               <ArrowRight className="w-4 h-4 ml-2" />

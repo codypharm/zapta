@@ -17,6 +17,7 @@ import {
   triggerAgentCompletedEvent,
   triggerAgentFailedEvent,
 } from "@/lib/webhooks/triggers";
+import { executeAgent } from "@/lib/agents/execute"; // NEW - use unified agent execution
 
 interface Message {
   role: "user" | "assistant";
@@ -152,58 +153,27 @@ export async function sendMessage(
       };
     }
 
-    // Search knowledge base for relevant context
+    // Use unified executeAgent (includes RAG, integrations, webhooks)
     const userSession = `${user.id}-${Date.now()}`;
-    const ragContext = await getRAGContext(profile.tenant_id, agentId, message, userSession);
-
-    // Build the prompt with agent configuration
-    const systemPrompt = buildSystemPrompt(
-      agent.name,
-      agent.config.instructions,
-      agent.config.tone,
-      ragContext.hasContext ? ragContext.context : undefined
-    );
-
-    // Prepare conversation history
-    const conversationMessages = [
-      { role: "system" as const, content: systemPrompt },
-      ...history.map((msg) => ({
-        role: msg.role as "user" | "assistant",
-        content: msg.content,
-      })),
-      { role: "user" as const, content: message },
-    ];
-
-    // Select AI model and call it
-    const model = selectAIModel(agent.config.model);
-
-    const { text, usage } = await generateText({
-      model,
-      messages: conversationMessages,
-      temperature: 0.7,
+    const result = await executeAgent(agentId, {
+      type: "chat",
+      message,
+      userSession
     });
 
     // Log usage to database
+    // Note: executeAgent already logs internally, but we need to track at message level
     await logUsage(
       supabase,
       profile.tenant_id,
       agentId,
-      usage?.inputTokens || 0,
-      usage?.outputTokens || 0
-    );
-
-    // Trigger webhook event for agent completion
-    await triggerAgentCompletedEvent(
-      profile.tenant_id,
-      agentId,
-      agent.name,
-      { type: "chat" as const, message },
-      { message: text, actions: [] }
+      0, // Token counting handled in executeAgent
+      0
     );
 
     return { 
-      message: text,
-      sources: ragContext.hasContext ? ragContext.sources : undefined
+      message: result.message,
+      sources: result.sources
     };
   } catch (error) {
     console.error("AI chat error:", error);

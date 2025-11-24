@@ -11,6 +11,9 @@ import { createGoogleGenerativeAI } from "@ai-sdk/google";
 import { createAnthropic } from "@ai-sdk/anthropic";
 import { createOpenAI } from "@ai-sdk/openai";
 import { getIntegrationMap } from "@/lib/integrations/registry";
+import { searchDocuments } from "@/lib/knowledge/actions";
+import { trackContextUsage } from "@/lib/knowledge/analytics";
+import { knowledgeConfig } from "@/lib/knowledge/config";
 import {
   triggerAgentCompletedEvent,
   triggerAgentFailedEvent,
@@ -23,6 +26,7 @@ interface AgentInput {
   subject?: string;
   body?: string;
   message?: string;
+  userSession?: string; // NEW - for RAG tracking and analytics
   payload?: any;
   timestamp?: string;
   attachments?: any[];
@@ -32,6 +36,7 @@ interface AgentInput {
 interface AgentOutput {
   message: string;
   actions?: any[];
+  sources?: string[]; // NEW - source documents from knowledge base
   metadata?: any;
 }
 
@@ -68,6 +73,113 @@ export async function executeAgent(
     
     agent = agentData; // Assign to outer variable
 
+    // 1.25. Check subscription validity and message usage limit (for chat messages)
+    if (input.type === "chat") {
+      const { validateSubscription, checkMessageLimit, incrementMessageUsage } = await import("@/lib/billing/usage");
+      const { canUseModel, getPlanLimits } = await import("@/lib/billing/plans");
+      
+      // Get tenant's subscription plan
+      const { data: tenant } = await supabase
+        .from("tenants")
+        .select("subscription_plan")
+        .eq("id", agent.tenant_id)
+        .single();
+      
+      const planId = tenant?.subscription_plan || "free";
+      
+      // First, validate subscription (checks for expired/canceled/past_due)
+      const subscriptionCheck = await validateSubscription(agent.tenant_id);
+      
+      if (!subscriptionCheck.valid) {
+        const errorMessages: Record<string, string> = {
+          canceled: "This service is currently unavailable (subscription canceled).",
+          past_due: "This service is currently unavailable (payment overdue).",
+          incomplete: "This service is currently unavailable (payment incomplete).",
+          expired: "This service is currently unavailable (subscription expired).",
+        };
+        
+        throw new Error(
+          errorMessages[subscriptionCheck.subscriptionStatus || ''] || 
+          subscriptionCheck.reason || 
+          "Service unavailable"
+        );
+      }
+      
+      // Check if agent's model is allowed on current plan
+      const agentModel = agent.config?.model || "gemini-2.0-flash";
+      if (!canUseModel(planId, agentModel)) {
+        const planLimits = getPlanLimits(planId);
+        const allowedModels = planLimits.models === '*' 
+          ? 'all models' 
+          : (planLimits.models as readonly string[]).join(', ');
+        
+        throw new Error(
+          `This agent uses ${agentModel} which is not available on your ${planId} plan. ` +
+          `Available models: ${allowedModels}. Please upgrade your plan or change the agent's model.`
+        );
+      }
+      
+      // Then check message limits
+      const usageCheck = await checkMessageLimit(agent.tenant_id);
+      
+      if (!usageCheck.allowed) {
+        throw new Error(
+          `Message limit reached (${usageCheck.current}/${usageCheck.limit}). Please upgrade your plan to continue.`
+        );
+      }
+      
+      // Increment usage after successful checks
+      await incrementMessageUsage(agent.tenant_id);
+    }
+
+    // 1.5. Retrieve RAG context from knowledge base (if applicable)
+    let ragContext = { hasContext: false, context: '', sources: [] as string[] };
+    
+    if (input.type === "chat" && input.message) {
+      try {
+        const result = await searchDocuments(
+          agent.tenant_id,
+          input.message,
+          agentId,
+          knowledgeConfig.rag.contextLimit,
+          knowledgeConfig.rag.contextThreshold,
+          input.userSession
+        );
+        
+        if (result.success && result.documents && result.documents.length > 0) {
+          // Track usage for each document
+          for (const doc of result.documents) {
+            try {
+              await trackContextUsage(
+                agent.tenant_id,
+                agentId,
+                doc.id,
+                input.message,
+                doc.similarity || 0,
+                input.userSession
+              );
+            } catch (trackError) {
+              console.error("Failed to track context usage:", trackError);
+            }
+          }
+          
+          // Format context for AI
+          ragContext = {
+            hasContext: true,
+            context: result.documents
+              .map((doc: any) => `[Document: ${doc.metadata?.originalFileName || 'Unknown'}]\n${doc.content}`)
+              .join('\n\n---\n\n'),
+            sources: result.documents.map((doc: any) => doc.metadata?.originalFileName || 'Unknown')
+          };
+          
+          console.log(`[RAG] Found ${result.documents.length} relevant documents for agent ${agentId}`);
+        }
+      } catch (ragError) {
+        console.error("RAG search error:", ragError);
+        // Continue without RAG context
+      }
+    }
+
     // 2. Build context (conversation history, knowledge base)
     const context = await buildContext(agent, input);
 
@@ -76,7 +188,8 @@ export async function executeAgent(
       agent.name,
       agent.config.instructions,
       agent.config.tone,
-      context
+      context,
+      ragContext.context // Pass RAG context to system prompt
     );
 
     // 4. Prepare conversation messages
@@ -121,6 +234,7 @@ export async function executeAgent(
     return {
       message: text,
       actions: actions || [],
+      sources: ragContext.hasContext ? ragContext.sources : undefined, // Include RAG sources if available
     };
   } catch (error) {
     console.error("Agent execution error:", error);
@@ -199,7 +313,8 @@ function buildSystemPrompt(
   name: string,
   instructions: string,
   tone: string,
-  context: any
+  context: any,
+  ragContext?: string // NEW - RAG context from knowledge base
 ): string {
   const toneInstructions = {
     professional:
@@ -212,29 +327,15 @@ function buildSystemPrompt(
   };
 
   const contextSection = context
-    ? `
-
-CONTEXT:
-- Tenant: ${context.tenant}
-- Agent Type: ${context.type}
-${context.messages ? `- Recent Messages: ${context.messages.length} messages` : ""}
-${context.knowledge ? `- Knowledge Base: ${context.knowledge.documents?.length || 0} documents available` : ""}
-
-Use this context to inform your responses.`
+    ? `\n\nCONTEXT:\n- Tenant: ${context.tenant}\n- Agent Type: ${context.type}\n${context.messages ? `- Recent Messages: ${context.messages.length} messages` : ""}\n${context.knowledge ? `- Knowledge Base: ${context.knowledge.documents?.length || 0} documents available` : ""}\n\nUse this context to inform your responses.`
     : "";
 
-  return `You are ${name}, an AI assistant.
+  // Add RAG context if available
+  const ragContextSection = ragContext
+    ? `\n\nKNOWLEDGE BASE CONTEXT:\n${ragContext}\n\nUse the above information from the knowledge base to provide accurate, context-specific answers. If the answer is in the knowledge base, use it. If not, provide general assistance.`
+    : "";
 
-${instructions}
-
-${toneInstructions[tone as keyof typeof toneInstructions] || toneInstructions.professional}${contextSection}
-
-Guidelines:
-- Be helpful and accurate
-- Stay in character as defined
-- Use available context when relevant
-- If you don't know something, admit it clearly
-- Keep responses concise but complete`;
+  return `You are ${name}, an AI assistant.\n\n${instructions}\n\n${toneInstructions[tone as keyof typeof toneInstructions] || toneInstructions.professional}${contextSection}${ragContextSection}\n\nGuidelines:\n- Be helpful and accurate\n- Stay in character as defined\n- Use available context when relevant\n- If you don't know something, admit it clearly\n- Keep responses concise but complete`;
 }
 
 /**
@@ -281,13 +382,21 @@ function selectAIModel(modelName: string) {
     });
 
     const modelMap: Record<string, string> = {
-      "gemini-1.5-flash": "gemini-flash-latest",
-      "gemini-2.5-flash": "gemini-flash-latest",
-      "gemini-1.5-pro": "gemini-pro-latest",
-      "gemini-pro": "gemini-pro-latest",
+      // Gemini 3 (Latest)
+      "gemini-3-pro": "gemini-3-pro-preview",
+      "gemini-3-pro-preview": "gemini-3-pro-preview",
+      // Gemini 2.0
+      "gemini-2.0-flash": "gemini-2.0-flash-exp",
+      "gemini-2.0-flash-thinking": "gemini-2.0-flash-thinking-exp",
+      // Gemini 1.5
+      "gemini-1.5-flash": "gemini-1.5-flash-latest",
+      "gemini-1.5-flash-8b": "gemini-1.5-flash-8b-latest",
+      "gemini-1.5-pro": "gemini-1.5-pro-latest",
+      // Legacy
+      "gemini-pro": "gemini-1.5-pro-latest",
     };
 
-    const actualModel = modelMap[modelName] || "gemini-flash-latest";
+    const actualModel = modelMap[modelName] || "gemini-3-pro-preview";
     return google(actualModel);
   } else if (modelName.includes("claude")) {
     const anthropic = createAnthropic({
@@ -295,25 +404,33 @@ function selectAIModel(modelName: string) {
     });
 
     const modelMap: Record<string, string> = {
-      "claude-3-5-sonnet": "claude-3-5-sonnet-20241022",
+      // Claude Sonnet 4.5 (latest - best coding model)
+      "claude-sonnet-4-5": "claude-sonnet-4-5",
+      "claude-4-sonnet": "claude-sonnet-4-5",
+      // Claude 3.5
+      "claude-3.5-sonnet": "claude-3-5-sonnet-20241022",
+      "claude-3.5-haiku": "claude-3-5-haiku-20241022",
+      // Claude 3
       "claude-3-sonnet": "claude-3-sonnet-20240229",
       "claude-3-opus": "claude-3-opus-20240229",
+      "claude-3-haiku": "claude-3-haiku-20240307",
     };
 
-    const actualModel = modelMap[modelName] || modelMap["claude-3-5-sonnet"];
+    const actualModel = modelMap[modelName] || modelMap["claude-sonnet-4-5"];
     return anthropic(actualModel);
   } else if (modelName.includes("gpt")) {
     const openai = createOpenAI({
       apiKey: process.env.OPENAI_API_KEY!,
     });
 
+    // Support common GPT model names
     return openai(modelName);
   } else {
-    // Default to Gemini
+    // Default to latest Gemini 2.0 Flash
     const google = createGoogleGenerativeAI({
       apiKey: process.env.GOOGLE_API_KEY!,
     });
-    return google("gemini-flash-latest");
+    return google("gemini-2.0-flash-exp");
   }
 }
 
@@ -329,7 +446,8 @@ async function processAgentActions(
 
   try {
     // Get integration instances with credentials loaded from database
-    const integrationMap = await getIntegrationMap(agent.tenant_id);
+    // Pass agent.id to filter by agent's allowed integrations
+    const integrationMap = await getIntegrationMap(agent.tenant_id, agent.id);
 
     console.log(
       `🔌 Available integrations for tenant: ${Array.from(integrationMap.keys()).join(", ")}`

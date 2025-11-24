@@ -24,5 +24,17 @@ export default async function DashboardLayout({
     redirect("/login");
   }
 
-  return <DashboardLayoutClient>{children}</DashboardLayoutClient>;
+  // Get user profile for display
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("full_name, email")
+    .eq("id", user.id)
+    .single();
+
+  const userData = {
+    name: profile?.full_name || user.email?.split("@")[0] || "User",
+    email: profile?.email || user.email || "",
+  };
+
+  return <DashboardLayoutClient user={userData}>{children}</DashboardLayoutClient>;
 }

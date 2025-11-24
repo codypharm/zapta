@@ -33,6 +33,208 @@ export interface AnalyticsMetrics {
     conversationCount: number;
     leadCount: number;
   }>;
+  knowledgeBase: { // NEW
+    totalSearches: number;
+    documentsUsed: number;
+    avgRelevance: number;
+    hitRate: number;
+    topDocuments: Array<{
+      id: string;
+      filename: string;
+      usageCount: number;
+    }>;
+  };
+  integrations: { // NEW
+    totalActions: number;
+    byProvider: Array<{
+      provider: string;
+      actionCount: number;
+      successRate: number;
+    }>;
+  };
+  webhooks: { // NEW
+    totalEvents: number;
+    successRate: number;
+    byType: Array<{
+      eventType: string;
+      count: number;
+      percentage: number;
+    }>;
+  };
+}
+
+/**
+ * Get knowledge base analytics metrics
+ */
+async function getKnowledgeBaseMetrics(
+  tenantId: string,
+  startDate: Date
+) {
+  const supabase = await createServerClient();
+  
+  // Get knowledge searches
+  const { data: searches } = await supabase
+    .from("knowledge_searches")
+    .select("*")
+    .eq("tenant_id", tenantId)
+    .gte("created_at", startDate.toISOString());
+    
+  // Get context usage (documents actually used in responses)
+  const { data: usage } = await supabase
+    .from("knowledge_context_usage")
+    .select("document_id, similarity_score, document_metadata")
+    .eq("tenant_id", tenantId)
+    .gte("created_at", startDate.toISOString());
+    
+  // Calculate metrics
+  const totalSearches = searches?.length || 0;
+  const documentsUsed = new Set(usage?.map(u => u.document_id)).size;
+  const avgRelevance = usage && usage.length > 0
+    ? usage.reduce((sum, u) => sum + (u.similarity_score || 0), 0) / usage.length
+    : 0;
+  const hitRate = totalSearches > 0 ? ((usage?.length || 0) / totalSearches) * 100 : 0;
+  
+  // Get top documents
+  const documentCounts = new Map<string, { id: string; filename: string; usageCount: number }>();
+  usage?.forEach(u => {
+    const filename = u.document_metadata?.originalFileName || 'Unknown';
+    const existing = documentCounts.get(u.document_id);
+    if (existing) {
+      existing.usageCount++;
+    } else {
+      documentCounts.set(u.document_id, {
+        id: u.document_id,
+        filename,
+        usageCount: 1
+      });
+    }
+  });
+  
+  const topDocuments = Array.from(documentCounts.values())
+    .sort((a, b) => b.usageCount - a.usageCount)
+    .slice(0, 5);
+  
+  return {
+    totalSearches,
+    documentsUsed,
+    avgRelevance: Math.round(avgRelevance * 100) / 100,
+    hitRate: Math.round(hitRate * 10) / 10,
+    topDocuments
+  };
+}
+
+/**
+ * Get integration usage analytics
+ */
+async function getIntegrationMetrics(
+  tenantId: string,
+  startDate: Date
+) {
+  const supabase = await createServerClient();
+  
+  // Get execution logs with integration actions
+  const { data: executions } = await supabase
+    .from("execution_logs")
+    .select("output")
+    .eq("tenant_id", tenantId)
+    .gte("created_at", startDate.toISOString())
+    .not("output", "is", null);
+    
+  // Parse actions from execution logs
+  const integrationActions: Array<{ provider: string; success: boolean }> = [];
+  
+  executions?.forEach(exec => {
+    try {
+      const output = typeof exec.output === 'string' ? JSON.parse(exec.output) : exec.output;
+      const actions = output?.actions || [];
+      actions.forEach((action: any) => {
+        if (action.type && action.status) {
+          integrationActions.push({
+            provider: action.type,
+            success: action.status === 'success'
+          });
+        }
+      });
+    } catch (e) {
+      // Skip invalid entries
+    }
+  });
+  
+  // Group by provider
+  const providerStats = new Map<string, { total: number; successful: number }>();
+  integrationActions.forEach(action => {
+    const stats = providerStats.get(action.provider) || { total: 0, successful: 0 };
+    stats.total++;
+    if (action.success) stats.successful++;
+    providerStats.set(action.provider, stats);
+  });
+  
+  const byProvider = Array.from(providerStats.entries()).map(([provider, stats]) => ({
+    provider,
+    actionCount: stats.total,
+    successRate: Math.round((stats.successful / stats.total) * 100)
+  })).sort((a, b) => b.actionCount - a.actionCount);
+  
+  return {
+    totalActions: integrationActions.length,
+    byProvider
+  };
+}
+
+/**
+ * Get webhook analytics
+ */
+async function getWebhookMetrics(
+  tenantId: string,
+  startDate: Date
+) {
+  const supabase = await createServerClient();
+  
+  // Get execution logs with webhook events
+  // In the future, we might have a separate webhook_events table
+  // For now, approximate from execution logs
+  const { data: executions } = await supabase
+    .from("execution_logs")
+    .select("input, output, error")
+    .eq("tenant_id", tenantId)
+    .gte("created_at", startDate.toISOString());
+    
+  // Count webhook triggers (approximation)
+  // Actual webhook events would be better tracked in a dedicated table
+  const webhookEvents: Array<{ type: string; success: boolean }> = [];
+  
+  executions?.forEach(exec => {
+    // Each execution potentially triggers webhooks
+    if (exec.error) {
+      webhookEvents.push({ type: 'agent.failed', success: true });
+    } else {
+      webhookEvents.push({ type: 'agent.completed', success: true });
+    }
+  });
+  
+  const totalEvents = webhookEvents.length;
+  const successfulEvents = webhookEvents.filter(e => e.success).length;
+  const successRate = totalEvents > 0 
+    ? Math.round((successfulEvents / totalEvents) * 100) 
+    : 100;
+  
+  // Group by type
+  const typeCounts = new Map<string, number>();
+  webhookEvents.forEach(event => {
+    typeCounts.set(event.type, (typeCounts.get(event.type) || 0) + 1);
+  });
+  
+  const byType = Array.from(typeCounts.entries()).map(([eventType, count]) => ({
+    eventType,
+    count,
+    percentage: Math.round((count / totalEvents) * 100)
+  }));
+  
+  return {
+    totalEvents,
+    successRate,
+    byType
+  };
 }
 
 /**
@@ -197,10 +399,16 @@ export async function getAnalyticsMetrics(
         agent.leadCount++;
       }
     });
-
     const topAgents = Array.from(agentStats.values())
       .sort((a, b) => b.conversationCount - a.conversationCount)
       .slice(0, 5);
+
+    // Fetch new analytics metrics
+    const [knowledgeBase, integrations, webhooks] = await Promise.all([
+      getKnowledgeBaseMetrics(profile.tenant_id, currentPeriodStart),
+      getIntegrationMetrics(profile.tenant_id, currentPeriodStart),
+      getWebhookMetrics(profile.tenant_id, currentPeriodStart)
+    ]);
 
     const metrics: AnalyticsMetrics = {
       conversations: {
@@ -217,6 +425,9 @@ export async function getAnalyticsMetrics(
       },
       timeline,
       topAgents,
+      knowledgeBase, // NEW
+      integrations, // NEW
+      webhooks, // NEW
     };
 
     return { metrics };

@@ -229,6 +229,47 @@ export class EmailIntegration extends BaseIntegration {
     const resend = this.getResendClient();
     const tenantId = this.getTenantId();
 
+    // Check email usage limit before sending (if billable)
+    if (params.billable !== false) {
+      const { createClient } = await import("@supabase/supabase-js");
+      const { getPlanLimits } = await import("@/lib/billing/plans");
+      
+      const supabase = createClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.SUPABASE_SERVICE_ROLE_KEY!
+      );
+
+      // Get tenant's subscription plan
+      const { data: tenant } = await supabase
+        .from("tenants")
+        .select("subscription_plan")
+        .eq("id", tenantId)
+        .single();
+
+      const planId = tenant?.subscription_plan || "free";
+      const planLimits = getPlanLimits(planId);
+
+      // Count emails sent this month
+      const now = new Date();
+      const firstOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+
+      const { count } = await supabase
+        .from("email_usage")
+        .select("*", { count: "exact", head: true })
+        .eq("tenant_id", tenantId)
+        .gte("created_at", firstOfMonth.toISOString())
+        .eq("billable", true);
+
+      const currentUsage = count || 0;
+      const emailLimit = planLimits.integrations.email;
+
+      if (emailLimit !== -1 && currentUsage >= emailLimit) {
+        throw new Error(
+          `Email limit reached (${currentUsage}/${emailLimit}). Please upgrade your plan to send more emails.`
+        );
+      }
+    }
+
     try {
       const { data, error } = await resend.emails.send({
         from: params.from || `${credentials.from_name || "Zapta"} <${credentials.from_email}>`,

@@ -18,18 +18,20 @@ export interface WebhookEventPayload {
 
 /**
  * Trigger webhook for an event
- * Sends webhook to ALL configured webhook integrations for the tenant that match filters
+ * Sends webhook to configured webhook integrations for the tenant that match filters
+ * and are allowed for this agent
  */
 export async function triggerWebhookEvent(
   tenantId: string,
+  agentId: string, // NEW - agent ID to filter integrations
   eventType: string,
   eventData: Record<string, any>
 ): Promise<void> {
   try {
-    console.log(`[WEBHOOK_TRIGGER] Event: ${eventType} for tenant: ${tenantId}`);
+    console.log(`[WEBHOOK_TRIGGER] Event: ${eventType} for agent: ${agentId}`);
 
-    // Get all integrations for tenant
-    const integrationMap = await getIntegrationMap(tenantId);
+    // Get integrations for this specific agent (respects integration selection)
+    const integrationMap = await getIntegrationMap(tenantId, agentId);
 
     // Find all webhook integrations
     const webhookIntegrations = Array.from(integrationMap.entries()).filter(
@@ -37,12 +39,12 @@ export async function triggerWebhookEvent(
     );
 
     if (webhookIntegrations.length === 0) {
-      console.log("[WEBHOOK_TRIGGER] No webhook integrations configured");
+      console.log("[WEBHOOK_TRIGGER] No webhook integrations configured for this agent");
       return;
     }
 
     console.log(
-      `[WEBHOOK_TRIGGER] Found ${webhookIntegrations.length} webhook(s), checking filters...`
+      `[WEBHOOK_TRIGGER] Found ${webhookIntegrations.length} webhook(s) for agent, checking filters...`
     );
 
     // Send to webhooks that match filters
@@ -99,7 +101,7 @@ export async function triggerAgentCompletedEvent(
   output: any,
   durationMs?: number
 ): Promise<void> {
-  await triggerWebhookEvent(tenantId, "agent.completed", {
+  await triggerWebhookEvent(tenantId, agentId, "agent.completed", {
     agent_id: agentId,
     agent_name: agentName,
     input_type: input.type,
@@ -120,7 +122,7 @@ export async function triggerAgentFailedEvent(
   input: any,
   error: string
 ): Promise<void> {
-  await triggerWebhookEvent(tenantId, "agent.failed", {
+  await triggerWebhookEvent(tenantId, agentId, "agent.failed", {
     agent_id: agentId,
     agent_name: agentName,
     input_type: input.type,

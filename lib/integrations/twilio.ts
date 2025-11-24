@@ -244,6 +244,51 @@ export class TwilioIntegration extends BaseIntegration {
     const tenantId = this.getTenantId();
     const fromNumber = this.getFromNumber();
 
+    // Check SMS usage limit before sending
+    const { createClient } = await import("@supabase/supabase-js");
+    const { getPlanLimits } = await import("@/lib/billing/plans");
+    
+    const supabase = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!
+    );
+
+    // Get tenant's subscription plan
+    const { data: tenant } = await supabase
+      .from("tenants")
+      .select("subscription_plan")
+      .eq("id", tenantId)
+      .single();
+
+    const planId = tenant?.subscription_plan || "free";
+    const planLimits = getPlanLimits(planId);
+
+    // Count SMS sent this month
+    const now = new Date();
+    const firstOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+
+    const { count } = await supabase
+      .from("sms_usage")
+      .select("*", { count: "exact", head: true })
+      .eq("tenant_id", tenantId)
+      .gte("created_at", firstOfMonth.toISOString())
+      .eq("direction", "outbound");
+
+    const currentUsage = count || 0;
+    const smsLimit = planLimits.integrations.sms;
+
+    if (smsLimit === 0) {
+      throw new Error(
+        `SMS is not available on your ${planId} plan. Please upgrade to use SMS features.`
+      );
+    }
+
+    if (smsLimit !== -1 && currentUsage >= smsLimit) {
+      throw new Error(
+        `SMS limit reached (${currentUsage}/${smsLimit}). Please upgrade your plan to send more SMS.`
+      );
+    }
+
     try {
       const messageData: any = {
         from: params.from || fromNumber,

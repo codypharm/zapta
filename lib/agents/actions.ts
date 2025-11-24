@@ -15,6 +15,7 @@ interface CreateAgentData {
   instructions: string;
   model: string;
   tone: string;
+  integration_ids?: string[]; // NEW - selected integration IDs
   leadCollection?: {
     enabled: boolean;
     fields: {
@@ -50,8 +51,21 @@ export async function createAgent(data: CreateAgentData) {
     .eq("id", user.id)
     .single();
 
-  if (!profile?.tenant_id) {
-    return { error: "User profile not found" };
+  if (!profile) {
+    return { error: "Profile not found" };
+  }
+
+  // Check agent creation limit
+  const { checkAgentLimit } = await import("@/lib/billing/usage");
+  const limitCheck = await checkAgentLimit(profile.tenant_id);
+
+  if (!limitCheck.allowed) {
+    return {
+      error: `Agent limit reached (${limitCheck.current}/${limitCheck.limit}). Please upgrade your plan to create more agents.`,
+      limitReached: true,
+      current: limitCheck.current,
+      limit: limitCheck.limit,
+    };
   }
 
   // Validate inputs
@@ -73,6 +87,7 @@ export async function createAgent(data: CreateAgentData) {
       model: data.model,
       tone: data.tone,
       instructions: data.instructions,
+      integration_ids: data.integration_ids || [], // Store selected integration IDs
     };
 
     // Add lead collection settings if provided

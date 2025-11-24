@@ -8,6 +8,7 @@ import { EmailIntegration } from "./email";
 import { HubSpotIntegration } from "./hubspot";
 import { GoogleCalendarIntegration } from "./google-calendar";
 import { TwilioIntegration } from "./twilio";
+// import { StripeIntegration } from "./stripe"; // TODO: Enable for Enterprise custom features
 import type { Integration, IntegrationClass } from "./base";
 
 /**
@@ -153,6 +154,9 @@ function createIntegrationInstance(
         const { WebhookIntegration } = require("./webhook");
         return new WebhookIntegration(decryptedIntegration);
 
+      // case "stripe": // TODO: Enable for Enterprise - payment processing is sensitive
+      //   return new StripeIntegration(decryptedIntegration);
+
       // TODO: Add more integrations as they're implemented
       // case "slack":
       //   return new SlackIntegration(integration);
@@ -180,12 +184,49 @@ function createIntegrationInstance(
  * Get integration map for agent execution
  * Returns a Map of provider -> integration instance
  * @param tenantId - Tenant ID
+ * @param agentId - Optional agent ID to filter by agent's allowed integrations
  * @returns Map of provider to integration instance
  */
 export async function getIntegrationMap(
-  tenantId: string
+  tenantId: string,
+  agentId?: string
 ): Promise<Map<string, IntegrationClass>> {
-  const integrations = await getTenantIntegrations(tenantId, "connected");
+  let integrations = await getTenantIntegrations(tenantId, "connected");
+  
+  // If agentId provided, filter by agent's allowed integrations
+  if (agentId) {
+    const supabase = await createServerClient();
+    const { data: agent } = await supabase
+      .from("agents")
+      .select("config")
+      .eq("id", agentId)
+      .single();
+      
+    // If agent has integration_ids configured, filter integrations
+    if (agent?.config?.integration_ids && Array.isArray(agent.config.integration_ids)) {
+      // Only include integrations that are in the agent's allowed list
+      if (agent.config.integration_ids.length > 0) {
+        integrations = integrations.filter((integration) =>
+          agent.config.integration_ids.includes((integration as any).integrationRecord?.id)
+        );
+        
+        console.log(`[REGISTRY] Filtered integrations for agent ${agentId}:`, {
+          allowed: agent.config.integration_ids,
+          available: integrations.length,
+        });
+      }
+      // If integration_ids is empty array, no integrations for this agent
+      else {
+        integrations = [];
+        console.log(`[REGISTRY] Agent ${agentId} has no integrations configured`);
+      }
+    }
+    // No integration_ids field = backward compatibility, allow all integrations
+    else {
+      console.log(`[REGISTRY] Agent ${agentId} using all integrations (backward compatible)`);
+    }
+  }
+  
   const map = new Map<string, IntegrationClass>();
 
   integrations.forEach((integration) => {

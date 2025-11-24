@@ -39,8 +39,10 @@ const navigation = [
 
 export default function DashboardLayoutClient({
   children,
+  user,
 }: {
   children: React.ReactNode;
+  user: { name: string; email: string } | null;
 }) {
   const pathname = usePathname();
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -49,6 +51,16 @@ export default function DashboardLayoutClient({
     const { logout } = await import("@/lib/auth/actions");
     await logout();
   };
+
+  // Get user initials for avatar
+  const userInitials = user?.name
+    ? user.name
+        .split(" ")
+        .map((n) => n[0])
+        .join("")
+        .toUpperCase()
+        .slice(0, 2)
+    : "U";
 
   return (
     <div className="flex h-screen bg-muted/30">
@@ -116,11 +128,15 @@ export default function DashboardLayoutClient({
               <DropdownMenuTrigger asChild>
                 <button className="flex w-full items-center gap-3 rounded-lg px-3 py-2 hover:bg-gray-100 transition-colors">
                   <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center text-primary font-semibold text-sm">
-                    U
+                    {userInitials}
                   </div>
-                  <div className="flex-1 text-left">
-                    <p className="text-sm font-medium text-gray-900">User</p>
-                    <p className="text-xs text-gray-500">View profile</p>
+                  <div className="flex-1 text-left overflow-hidden">
+                    <p className="text-sm font-medium text-gray-900 truncate">
+                      {user?.name || "User"}
+                    </p>
+                    <p className="text-xs text-gray-500 truncate">
+                      {user?.email || "View profile"}
+                    </p>
                   </div>
                   <ChevronDown className="w-4 h-4 text-gray-400" />
                 </button>

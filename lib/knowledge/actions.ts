@@ -91,6 +91,21 @@ export async function uploadDocument(
   const supabase = await createServerClient();
 
   try {
+    // Calculate file size in bytes (UTF-8 encoding)
+    const fileSizeBytes = new TextEncoder().encode(content).length;
+    
+    // Check storage limit BEFORE processing
+    const { checkStorageLimit, incrementStorageUsage } = await import("@/lib/billing/storage");
+    const storageCheck = await checkStorageLimit(tenantId, fileSizeBytes);
+    
+    if (!storageCheck.allowed) {
+      const fileSizeMB = (fileSizeBytes / (1024 * 1024)).toFixed(2);
+      throw new Error(
+        `Storage limit reached (${storageCheck.currentMB}/${storageCheck.limitMB} MB). ` +
+        `This file is ${fileSizeMB} MB. Please upgrade your plan or delete existing documents.`
+      );
+    }
+
     // Chunk the document
     const chunks = chunkDocument(content);
 
@@ -121,6 +136,7 @@ export async function uploadDocument(
         totalChunks: chunks.length,
         originalFileName: name,
         embeddingProvider: embeddingResult.provider,
+        fileSizeBytes, // Store original file size
       },
     }));
 
@@ -134,10 +150,15 @@ export async function uploadDocument(
       throw new Error(`Database error: ${error.message}`);
     }
 
+    // Increment storage usage after successful upload
+    await incrementStorageUsage(tenantId, fileSizeBytes);
+
     return {
       success: true,
       documents: data,
       chunksCreated: chunks.length,
+      sizeBytes: fileSizeBytes,
+      sizeMB: (fileSizeBytes / (1024 * 1024)).toFixed(2),
     };
   } catch (error) {
     console.error("Error uploading document:", error);
@@ -336,10 +357,10 @@ export async function deleteDocument(tenantId: string, documentName: string) {
   const supabase = await createServerClient();
 
   try {
-    // First, get all chunks for this document to verify it exists
+    // First, get all chunks for this document to verify it exists and get file size
     const { data: chunks, error: selectError } = await supabase
       .from("documents")
-      .select("id")
+      .select("id, metadata")
       .eq("tenant_id", tenantId)
       .eq("metadata->>originalFileName", documentName);
 
@@ -354,6 +375,9 @@ export async function deleteDocument(tenantId: string, documentName: string) {
       };
     }
 
+    // Get original file size from metadata (stored in first chunk)
+    const fileSizeBytes = chunks[0]?.metadata?.fileSizeBytes || 0;
+
     // Delete all chunks for this document
     const { error } = await supabase
       .from("documents")
@@ -365,7 +389,13 @@ export async function deleteDocument(tenantId: string, documentName: string) {
       throw new Error(`Database error: ${error.message}`);
     }
 
-    return { success: true };
+    // Decrement storage usage
+    if (fileSizeBytes > 0) {
+      const { decrementStorageUsage } = await import("@/lib/billing/storage");
+      await decrementStorageUsage(tenantId, fileSizeBytes);
+    }
+
+    return { success: true, freedBytes: fileSizeBytes };
   } catch (error) {
     console.error("Error deleting document:", error);
     return {

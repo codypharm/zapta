@@ -5,8 +5,9 @@
 
 "use client";
 
-import { Button } from "@/components/ui/button";
+import Image from "next/image";
 import Link from "next/link";
+import { Button } from "@/components/ui/button";
 import { motion } from "framer-motion";
 import {
   Sparkles,
@@ -17,45 +18,29 @@ import {
   BarChart3,
   ArrowRight,
   Check,
+  Bot,
+  Code,
+  CheckCircle,
+  Users,
+  Mail,
+  Calendar,
+  Webhook,
+  TrendingUp,
 } from "lucide-react";
+import { MarketingHeader } from "@/components/marketing/header";
+import { createServerClient } from "@/lib/supabase/server";
 
-export default function HomePage() {
+export default async function HomePage() {
+  // Check if user is authenticated
+  const supabase = await createServerClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
   return (
     <main className="relative">
       {/* Header/Navbar */}
-      <header className="fixed top-0 w-full bg-white/80 backdrop-blur-md border-b border-gray-200 z-50">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between h-16">
-            {/* Logo */}
-            <Link href="/" className="flex items-center gap-2">
-              <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center">
-                <Sparkles className="w-5 h-5 text-white" />
-              </div>
-              <span className="text-xl font-bold text-foreground">Zapta</span>
-            </Link>
-
-            {/* Navigation Links */}
-            <nav className="hidden md:flex items-center gap-8">
-              <a href="#features" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">
-                Features
-              </a>
-              <a href="#how-it-works" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">
-                How it Works
-              </a>
-            </nav>
-
-            {/* CTA Buttons */}
-            <div className="flex items-center gap-3">
-              <Button asChild variant="ghost" size="sm" className="hover:bg-primary/10 hover:text-primary">
-                <Link href="/login">Sign In</Link>
-              </Button>
-              <Button asChild size="sm" className="font-semibold">
-                <Link href="/signup">Get Started</Link>
-              </Button>
-            </div>
-          </div>
-        </div>
-      </header>
+      <MarketingHeader isAuthenticated={!!user} />
 
       {/* Hero Section */}
       <section className="relative min-h-screen flex items-center justify-center hero-bg pt-16">

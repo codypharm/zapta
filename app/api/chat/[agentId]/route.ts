@@ -16,6 +16,7 @@ import {
   triggerAgentCompletedEvent,
   triggerAgentFailedEvent,
 } from "@/lib/webhooks/triggers";
+import { executeAgent } from "@/lib/agents/execute"; // NEW - use unified agent execution
 
 // Create Supabase client with service role (bypass RLS for public endpoint)
 const supabase = createClient(
@@ -84,61 +85,43 @@ export async function POST(
       );
     }
 
-    // Search knowledge base for relevant context
+    // Use unified executeAgent (includes RAG, integrations, webhooks)
     const userSession = `widget-${sessionId}-${Date.now()}`;
-    const ragContext = await getRAGContext(agent.tenant_id, agentId, message, userSession);
-
-    // Build system prompt with RAG context
-    const systemPrompt = buildSystemPrompt(
-      agent.name,
-      agent.config.instructions,
-      agent.config.tone,
-      ragContext.hasContext ? ragContext.context : undefined
-    );
-
-    // Prepare conversation messages
-    const conversationMessages = [
-      { role: "system" as const, content: systemPrompt },
-      ...history.map((msg: Message) => ({
-        role: msg.role as "user" | "assistant",
-        content: msg.content,
-      })),
-      { role: "user" as const, content: message },
-    ];
-
-    // Select and call AI model
-    const model = selectAIModel(agent.config.model);
-
-    const { text } = await generateText({
-      model,
-      messages: conversationMessages,
-      temperature: 0.7,
+    const result = await executeAgent(agentId, {
+      type: "chat",
+      message,
+      userSession
     });
 
     // Save conversation to database
     await saveConversation(agent.id, agent.tenant_id, sessionId, [
       ...history,
       { role: "user", content: message },
-      { role: "assistant", content: text },
+      { role: "assistant", content: result.message },
     ], leadId);
-
-    // Trigger webhook event for agent completion
-    await triggerAgentCompletedEvent(
-      agent.tenant_id,
-      agent.id,
-      agent.name,
-      { type: "chat" as const, message },
-      { message: text, actions: [] }
-    );
 
     // Return response with sources
     return NextResponse.json({
-      message: text,
+      message: result.message,
       sessionId,
-      sources: ragContext.hasContext ? ragContext.sources : undefined,
+      sources: result.sources,
     });
   } catch (error) {
     console.error("Widget chat error:", error);
+    
+    const errorMessage = (error as Error)?.message || "Unknown error";
+    
+    // Check if it's a usage limit or subscription error
+    const isLimitError = errorMessage.includes("limit reached") || 
+                         errorMessage.includes("upgrade your plan");
+    
+    const isSubscriptionError = errorMessage.includes("subscription") ||
+                                errorMessage.includes("payment") ||
+                                errorMessage.includes("Service unavailable") ||
+                                errorMessage.includes("currently unavailable");
+    
+    const isModelRestriction = errorMessage.includes("not available on your") ||
+                               errorMessage.includes("Available models:");
     
     // Try to trigger failure webhook if we have agent context
     try {
@@ -155,15 +138,46 @@ export async function POST(
           agentId,
           agent.name,
           { type: "chat" as const },
-          (error as Error)?.message || "Unknown error"
+          errorMessage
         );
       }
     } catch (webhookError) {
       // Ignore webhook errors
     }
     
+    // Return user-friendly error messages
+    if (isModelRestriction) {
+      return NextResponse.json(
+        { 
+          error: "This agent's configuration requires a plan upgrade. Please contact the site owner.",
+          modelRestriction: true 
+        },
+        { status: 403 } // Forbidden
+      );
+    }
+    
+    if (isSubscriptionError) {
+      return NextResponse.json(
+        { 
+          error: "This service is temporarily unavailable. Please contact support if this persists.",
+          subscriptionError: true 
+        },
+        { status: 503 } // Service Unavailable
+      );
+    }
+    
+    if (isLimitError) {
+      return NextResponse.json(
+        { 
+          error: "This agent has reached its usage limit. Please try again later or contact support.",
+          limitReached: true 
+        },
+        { status: 429 } // Too Many Requests
+      );
+    }
+    
     return NextResponse.json(
-      { error: "Failed to process message" },
+      { error: "I'm having trouble responding right now. Please try again in a moment." },
       { status: 500 }
     );
   }

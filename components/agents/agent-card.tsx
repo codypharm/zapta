@@ -21,7 +21,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Bot, MessageSquare, Edit, Trash2, MoreVertical, Sparkles, TestTube } from "lucide-react";
+import { Bot, MessageSquare, Edit, Trash2, MoreVertical, Sparkles, PlayCircle } from "lucide-react";
 import { deleteAgent } from "@/lib/agents/actions";
 import { useRouter } from "next/navigation";
 
@@ -103,7 +103,7 @@ export function AgentCard({ agent, conversationCount = 0 }: AgentCardProps) {
               <DropdownMenuContent align="end">
                 <DropdownMenuItem asChild>
                   <Link href={`/agents/${agent.id}`} className="cursor-pointer">
-                    <TestTube className="w-4 h-4 mr-2" />
+                    <PlayCircle className="w-4 h-4 mr-2" />
                     Test Agent
                   </Link>
                 </DropdownMenuItem>
@@ -157,7 +157,7 @@ export function AgentCard({ agent, conversationCount = 0 }: AgentCardProps) {
           <div className="flex gap-2 pt-2">
             <Button asChild className="flex-1" size="sm">
               <Link href={`/agents/${agent.id}`}>
-                <TestTube className="w-3.5 h-3.5 mr-1.5" />
+                <PlayCircle className="w-3.5 h-3.5 mr-1.5" />
                 Test
               </Link>
             </Button>

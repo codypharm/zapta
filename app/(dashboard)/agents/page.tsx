@@ -10,6 +10,8 @@ import { Card, CardContent } from "@/components/ui/card";
 import Link from "next/link";
 import { Bot, Plus } from "lucide-react";
 import { AgentCard } from "@/components/agents/agent-card";
+import { UsageLimitBanner } from "@/components/billing/usage-limit-banner";
+import { checkAgentLimit } from "@/lib/billing/usage";
 
 export default async function AgentsPage() {
   const supabase = await createServerClient();
@@ -21,6 +23,19 @@ export default async function AgentsPage() {
 
   if (!user) {
     redirect("/login");
+  }
+
+  // Get user's tenant for limit checking
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("tenant_id")
+    .eq("id", user.id)
+    .single();
+
+  // Check agent limits
+  let agentUsage = null;
+  if (profile?.tenant_id) {
+    agentUsage = await checkAgentLimit(profile.tenant_id);
   }
 
   // Get user's agents
@@ -54,15 +69,22 @@ export default async function AgentsPage() {
               Create and manage your AI agents
             </p>
           </div>
-          {agents && agents.length > 0 && (
-            <Button asChild>
-              <Link href="/agents/new">
-                <Plus className="w-4 h-4 mr-2" />
-                Create Agent
-              </Link>
-            </Button>
-          )}
+          <Button asChild size="lg">
+            <Link href="/agents/new">
+              <Plus className="mr-2 h-5 w-5" />
+              Create Agent
+            </Link>
+          </Button>
         </div>
+
+        {/* Agent Usage Limit Banner */}
+        {agentUsage && (
+          <UsageLimitBanner
+            current={agentUsage.current}
+            limit={agentUsage.limit}
+            resourceType="agents"
+          />
+        )}
 
         {/* Empty State */}
         {!agents || agents.length === 0 ? (
