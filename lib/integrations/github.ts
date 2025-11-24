@@ -28,7 +28,7 @@ export class GitHubIntegration extends BaseIntegration {
     };
   }
 
-  private getCredentials(): GitHubCredentials {
+  protected getCredentials(): GitHubCredentials {
     // In a real implementation, this would fetch from secure storage
     return {} as GitHubCredentials;
   }

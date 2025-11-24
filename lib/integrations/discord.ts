@@ -28,7 +28,7 @@ export class DiscordIntegration extends BaseIntegration {
     };
   }
 
-  private getCredentials(): DiscordCredentials {
+  protected getCredentials(): DiscordCredentials {
     // In a real implementation, this would fetch from secure storage
     return {} as DiscordCredentials;
   }

@@ -101,7 +101,7 @@ export async function POST(request: NextRequest) {
       .default;
 
     try {
-      const hubspotInstance = new hubspotIntegration();
+      const hubspotInstance = new hubspotIntegration(profile.tenant_id);
       const dealId = await hubspotInstance.createDeal({
         properties: {
           dealname: dealData.dealname,
@@ -110,8 +110,6 @@ export async function POST(request: NextRequest) {
           closedate: dealData.closedate,
           hubspot_owner_id: dealData.hubspot_owner_id,
         },
-        amount: amount || 0,
-        stage: stage || "appointmentscheduled",
       });
 
       // Store deal in database
@@ -207,17 +205,13 @@ export async function PUT(request: NextRequest) {
       .default;
 
     try {
-      const hubspotInstance = new hubspotIntegration();
+      const hubspotInstance = new hubspotIntegration(profile.tenant_id);
       await hubspotInstance.updateDeal(dealId, {
         properties: {
           dealname: dealData.dealname,
-          amount: amount,
-          dealstage: stage,
           closedate: dealData.closedate,
           hubspot_owner_id: dealData.hubspot_owner_id,
         },
-        amount: amount,
-        stage: stage,
       });
 
       // Update deal in database
@@ -285,12 +279,26 @@ export async function DELETE(request: NextRequest) {
     const body = await request.json();
     const { archived } = body;
 
+    // Get user's tenant_id
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("tenant_id")
+      .eq("user_id", user.id)
+      .single();
+
+    if (!profile?.tenant_id) {
+      return NextResponse.json(
+        { error: "User profile not found" },
+        { status: 404 }
+      );
+    }
+
     // Archive deal in HubSpot
     const hubspotIntegration = (await import("@/lib/integrations/hubspot"))
       .default;
 
     try {
-      const hubspotInstance = new hubspotIntegration();
+      const hubspotInstance = new hubspotIntegration(profile.tenant_id);
       await hubspotInstance.updateDeal(dealId, {
         properties: {
           archived: true,

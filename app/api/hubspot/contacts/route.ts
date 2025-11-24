@@ -101,7 +101,7 @@ export async function POST(request: NextRequest) {
       .default;
 
     try {
-      const hubspotInstance = new hubspotIntegration();
+      const hubspotInstance = new hubspotIntegration(profile.tenant_id);
       const contactId = await hubspotInstance.createContact({
         properties: {
           email: contactData.email,
@@ -203,7 +203,7 @@ export async function PUT(request: NextRequest) {
       .default;
 
     try {
-      const hubspotInstance = new hubspotIntegration();
+      const hubspotInstance = new hubspotIntegration(profile.tenant_id);
       await hubspotInstance.updateContact(contactId, {
         properties: {
           email: contactData.email,
@@ -276,12 +276,26 @@ export async function DELETE(request: NextRequest) {
     const body = await request.json();
     const { archived } = body;
 
+    // Get user's tenant_id
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("tenant_id")
+      .eq("user_id", user.id)
+      .single();
+
+    if (!profile?.tenant_id) {
+      return NextResponse.json(
+        { error: "User profile not found" },
+        { status: 404 }
+      );
+    }
+
     // Archive contact in HubSpot
     const hubspotIntegration = (await import("@/lib/integrations/hubspot"))
       .default;
 
     try {
-      const hubspotInstance = new hubspotIntegration();
+      const hubspotInstance = new hubspotIntegration(profile.tenant_id);
       await hubspotInstance.updateContact(contactId, {
         properties: {
           archived: true,

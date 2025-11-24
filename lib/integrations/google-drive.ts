@@ -30,7 +30,7 @@ export class GoogleDriveIntegration extends BaseIntegration {
     };
   }
 
-  private getCredentials(): GoogleDriveCredentials {
+  protected getCredentials(): GoogleDriveCredentials {
     // In a real implementation, this would fetch from secure storage
     return {} as GoogleDriveCredentials;
   }
@@ -144,8 +144,9 @@ export class GoogleDriveIntegration extends BaseIntegration {
     if (typeof fileData.content === "string") {
       formData.append("file", fileData.content);
     } else {
-      // Convert Buffer to Blob for file upload
-      const blob = new Blob([fileData.content]);
+      // Convert Buffer to Uint8Array then to Blob for file upload
+      const uint8Array = new Uint8Array(fileData.content);
+      const blob = new Blob([uint8Array], { type: fileData.mime_type || 'application/octet-stream' });
       formData.append("file", blob, fileData.name);
     }
 

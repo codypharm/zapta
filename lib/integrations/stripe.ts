@@ -37,7 +37,7 @@ export class StripeIntegration extends BaseIntegration {
     };
   }
 
-  private getCredentials(): StripeCredentials {
+  protected getCredentials(): StripeCredentials {
     // In a real implementation, this would fetch from secure storage
     return {} as StripeCredentials;
   }

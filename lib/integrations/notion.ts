@@ -28,7 +28,7 @@ export class NotionIntegration extends BaseIntegration {
     };
   }
 
-  private getCredentials(): NotionCredentials {
+  protected getCredentials(): NotionCredentials {
     // In a real implementation, this would fetch from secure storage
     return {} as NotionCredentials;
   }
