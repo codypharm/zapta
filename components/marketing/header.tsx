@@ -7,7 +7,7 @@
 
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
-import { Sparkles } from "lucide-react";
+import Image from "next/image";
 
 interface MarketingHeaderProps {
   isAuthenticated: boolean;
@@ -20,10 +20,13 @@ export function MarketingHeader({ isAuthenticated }: MarketingHeaderProps) {
         <div className="flex items-center justify-between h-16">
           {/* Logo */}
           <Link href="/" className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center">
-              <Sparkles className="w-5 h-5 text-white" />
-            </div>
-            <span className="text-xl font-bold text-foreground">Zapta</span>
+            <Image 
+              src="/assets/logo.png" 
+              alt="Zapta" 
+              width={600} 
+              height={100}
+              className="h-14 w-auto"
+            />
           </Link>
 
           {/* Navigation Links */}

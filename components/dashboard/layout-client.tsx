@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
+import Image from "next/image";
 import {
   LayoutDashboard,
   Bot,
@@ -12,7 +13,6 @@ import {
   Menu,
   X,
   LogOut,
-  Sparkles,
   ChevronDown,
   Users,
   BarChart3,
@@ -84,10 +84,15 @@ export default function DashboardLayoutClient({
         <div className="flex h-full flex-col">
           {/* Logo */}
           <div className="flex h-16 items-center gap-2 px-6 border-b">
-            <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center">
-              <Sparkles className="w-5 h-5 text-white" />
-            </div>
-            <span className="text-xl font-bold">Zapta</span>
+            <Link href="/" className="flex items-center gap-2">
+              <Image 
+                src="/assets/logo.png" 
+                alt="Zapta" 
+                width={200} 
+                height={60}
+                className="h-14 w-auto"
+              />
+            </Link>
             <button
               onClick={() => setSidebarOpen(false)}
               className="ml-auto lg:hidden"
