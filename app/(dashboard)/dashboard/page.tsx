@@ -55,8 +55,8 @@ async function DashboardContent({ params }: { params: { verified?: string } }) {
                     (stats?.recentLeads || 0) === 0;
 
   return (
-    <div className="p-8">
-      <div className="mx-auto max-w-7xl space-y-8">
+    <div className="p-4 sm:p-6 md:p-8">
+      <div className="mx-auto max-w-7xl space-y-6 sm:space-y-8">
         {/* Email verification success message */}
         {params.verified === "true" && (
           <Alert className="border-green-200 bg-green-50 text-green-800">
@@ -81,19 +81,19 @@ async function DashboardContent({ params }: { params: { verified?: string } }) {
         )}
 
         {/* Welcome section */}
-        <div className="flex items-start justify-between">
+        <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
           <div>
-            <h2 className="text-3xl font-bold tracking-tight">
+            <h2 className="text-2xl sm:text-3xl font-bold tracking-tight">
               Welcome back, {profile?.full_name?.split(" ")[0] || "there"}! 👋
             </h2>
-            <p className="text-muted-foreground mt-2">
+            <p className="text-sm sm:text-base text-muted-foreground mt-2">
               Organization:{" "}
               <span className="font-semibold">
                 {(profile as any)?.tenants?.name}
               </span>
             </p>
           </div>
-          <Button asChild variant="outline">
+          <Button asChild variant="outline" className="w-full sm:w-auto">
             <Link href="/analytics">
               <BarChart3 className="w-4 h-4 mr-2" />
               View Full Analytics
@@ -104,36 +104,36 @@ async function DashboardContent({ params }: { params: { verified?: string } }) {
         {/* New User Welcome Card */}
         {isNewUser && (
           <Card className="border-primary bg-primary/5">
-            <CardContent className="py-8">
-              <div className="text-center space-y-4">
-                <h3 className="text-xl font-bold">🎉 Welcome to Zapta!</h3>
-                <p className="text-muted-foreground max-w-lg mx-auto">
+            <CardContent className="py-6 sm:py-8">
+              <div className="text-center space-y-3 sm:space-y-4">
+                <h3 className="text-lg sm:text-xl font-bold">🎉 Welcome to Zapta!</h3>
+                <p className="text-sm sm:text-base text-muted-foreground max-w-lg mx-auto px-4">
                   Get started in 3 easy steps:
                 </p>
-                <div className="grid gap-4 md:grid-cols-3 mt-6">
-                  <div className="space-y-2">
-                    <div className="text-3xl">1️⃣</div>
-                    <h4 className="font-semibold">Create an Agent</h4>
-                    <p className="text-sm text-muted-foreground">
+                <div className="grid gap-4 grid-cols-1 sm:grid-cols-3 mt-4 sm:mt-6">
+                  <div className="space-y-2 p-4 sm:p-0">
+                    <div className="text-2xl sm:text-3xl">1️⃣</div>
+                    <h4 className="font-semibold text-sm sm:text-base">Create an Agent</h4>
+                    <p className="text-xs sm:text-sm text-muted-foreground">
                       Build your first AI agent in minutes
                     </p>
                   </div>
-                  <div className="space-y-2">
-                    <div className="text-3xl">2️⃣</div>
-                    <h4 className="font-semibold">Add Knowledge</h4>
-                    <p className="text-sm text-muted-foreground">
+                  <div className="space-y-2 p-4 sm:p-0">
+                    <div className="text-2xl sm:text-3xl">2️⃣</div>
+                    <h4 className="font-semibold text-sm sm:text-base">Add Knowledge</h4>
+                    <p className="text-xs sm:text-sm text-muted-foreground">
                       Upload documents to help your agent answer questions
                     </p>
                   </div>
-                  <div className="space-y-2">
-                    <div className="text-3xl">3️⃣</div>
-                    <h4 className="font-semibold">Start Chatting</h4>
-                    <p className="text-sm text-muted-foreground">
+                  <div className="space-y-2 p-4 sm:p-0">
+                    <div className="text-2xl sm:text-3xl">3️⃣</div>
+                    <h4 className="font-semibold text-sm sm:text-base">Start Chatting</h4>
+                    <p className="text-xs sm:text-sm text-muted-foreground">
                       Test your agent and share with users
                     </p>
                   </div>
                 </div>
-                <Button asChild size="lg" className="mt-4">
+                <Button asChild size="lg" className="mt-4 w-full sm:w-auto">
                   <Link href="/agents/new">Create Your First Agent →</Link>
                 </Button>
               </div>
@@ -142,7 +142,7 @@ async function DashboardContent({ params }: { params: { verified?: string } }) {
         )}
 
         {/* Quick stats */}
-        <div className="grid gap-4 md:grid-cols-3">
+        <div className="grid gap-4 grid-cols-1 sm:grid-cols-3">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">
@@ -194,7 +194,7 @@ async function DashboardContent({ params }: { params: { verified?: string } }) {
         </div>
 
         {/* Two column layout */}
-        <div className="grid gap-6 lg:grid-cols-2">
+        <div className="grid gap-6 grid-cols-1 lg:grid-cols-2">
           {/* Recent Activity with Empty State */}
           {activities && activities.length > 0 ? (
             <ActivityFeed activities={activities} />
@@ -220,49 +220,49 @@ async function DashboardContent({ params }: { params: { verified?: string } }) {
             <CardHeader>
               <CardTitle>Quick Actions</CardTitle>
             </CardHeader>
-            <CardContent className="space-y-4">
+            <CardContent className="space-y-3 sm:space-y-4">
               {/* Primary action - more prominent */}
-              <div className="flex items-start gap-4 p-4 rounded-lg bg-primary/10 border-2 border-primary/20">
+              <div className="flex flex-col sm:flex-row items-start gap-3 sm:gap-4 p-4 rounded-lg bg-primary/10 border-2 border-primary/20">
                 <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg bg-primary">
                   <Bot className="w-6 h-6 text-primary-foreground" />
                 </div>
-                <div className="flex-1 space-y-2">
-                  <h3 className="font-bold">Create Agent</h3>
-                  <p className="text-sm text-muted-foreground">
+                <div className="flex-1 space-y-2 w-full">
+                  <h3 className="font-bold text-base">Create Agent</h3>
+                  <p className="text-xs sm:text-sm text-muted-foreground">
                     Build a new AI agent in minutes using natural language
                   </p>
-                  <Button asChild size="lg" className="mt-2">
+                  <Button asChild size="lg" className="mt-2 w-full sm:w-auto">
                     <Link href="/agents/new">Get Started →</Link>
                   </Button>
                 </div>
               </div>
 
               {/* Secondary actions */}
-              <div className="flex items-start gap-4 p-4 rounded-lg border hover:border-primary/50 transition-colors">
+              <div className="flex flex-col sm:flex-row items-start gap-3 sm:gap-4 p-4 rounded-lg border hover:border-primary/50 transition-colors">
                 <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-green-100">
                   <Users className="w-5 h-5 text-green-600" />
                 </div>
-                <div className="flex-1 space-y-2">
-                  <h3 className="font-semibold">View Leads</h3>
-                  <p className="text-sm text-muted-foreground">
+                <div className="flex-1 space-y-2 w-full">
+                  <h3 className="font-semibold text-sm sm:text-base">View Leads</h3>
+                  <p className="text-xs sm:text-sm text-muted-foreground">
                     See all leads captured by your agents
                   </p>
-                  <Button asChild size="sm" variant="outline" className="mt-2">
+                  <Button asChild size="sm" variant="outline" className="mt-2 w-full sm:w-auto">
                     <Link href="/leads">View Leads →</Link>
                   </Button>
                 </div>
               </div>
 
-              <div className="flex items-start gap-4 p-4 rounded-lg border hover:border-primary/50 transition-colors">
+              <div className="flex flex-col sm:flex-row items-start gap-3 sm:gap-4 p-4 rounded-lg border hover:border-primary/50 transition-colors">
                 <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-blue-100">
                   <MessageSquare className="w-5 h-5 text-blue-600" />
                 </div>
-                <div className="flex-1 space-y-2">
-                  <h3 className="font-semibold">Conversations</h3>
-                  <p className="text-sm text-muted-foreground">
+                <div className="flex-1 space-y-2 w-full">
+                  <h3 className="font-semibold text-sm sm:text-base">Conversations</h3>
+                  <p className="text-xs sm:text-sm text-muted-foreground">
                     Review chat history and agent interactions
                   </p>
-                  <Button asChild size="sm" variant="outline" className="mt-2">
+                  <Button asChild size="sm" variant="outline" className="mt-2 w-full sm:w-auto">
                     <Link href="/conversations">View All →</Link>
                   </Button>
                 </div>
@@ -305,8 +305,8 @@ export default async function DashboardPage({
 
   return (
     <Suspense fallback={
-      <div className="p-8">
-        <div className="mx-auto max-w-7xl space-y-8">
+      <div className="p-4 sm:p-6 md:p-8">
+        <div className="mx-auto max-w-7xl space-y-6 sm:space-y-8">
           <div className="space-y-2">
             <div className="h-10 w-64 bg-muted animate-pulse rounded" />
             <div className="h-4 w-48 bg-muted animate-pulse rounded" />

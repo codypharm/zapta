@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Image from "next/image";
 import {
   LayoutDashboard,
@@ -17,7 +17,6 @@ import {
   Users,
   BarChart3,
 } from "lucide-react";
-import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -46,11 +45,33 @@ export default function DashboardLayoutClient({
 }) {
   const pathname = usePathname();
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   const handleLogout = async () => {
     const { logout } = await import("@/lib/auth/actions");
     await logout();
   };
+
+  // Don't render interactive elements until mounted
+  if (!mounted) {
+    return (
+      <div className="flex h-screen bg-muted/30">
+        <div className="flex items-center justify-center w-full">
+          <Image
+            src="/assets/logo.png"
+            alt="Loading"
+            width={80}
+            height={80}
+            className="w-20 h-20 animate-pulse"
+          />
+        </div>
+      </div>
+    );
+  }
 
   // Get user initials for avatar
   const userInitials = user?.name
@@ -63,43 +84,52 @@ export default function DashboardLayoutClient({
     : "U";
 
   return (
-    <div className="flex h-screen bg-muted/30">
+    <div className="flex h-screen bg-muted/30 relative">
+      {/* Menu Toggle Button - Transforms between Hamburger and X */}
+      <button
+        type="button"
+        onClick={() => setSidebarOpen(!sidebarOpen)}
+        className="lg:hidden fixed top-3 left-4 z-[200] flex items-center justify-center w-10 h-10 bg-white rounded-lg hover:bg-gray-100 active:bg-gray-200 transition-colors border border-gray-200 focus:outline-none focus:ring-2 focus:ring-primary"
+        aria-label={sidebarOpen ? "Close navigation menu" : "Open navigation menu"}
+      >
+        {sidebarOpen ? (
+          <X className="w-6 h-6 text-gray-700" />
+        ) : (
+          <Menu className="w-6 h-6 text-gray-700" />
+        )}
+      </button>
+
       {/* Mobile sidebar backdrop */}
-      {sidebarOpen && (
-        <div
-          className="fixed inset-0 bg-black/50 z-40 lg:hidden"
-          onClick={() => setSidebarOpen(false)}
-        />
-      )}
+      <div
+        className={`fixed inset-0 bg-black/50 z-[60] lg:hidden transition-opacity duration-300 ${
+          sidebarOpen ? "opacity-100" : "opacity-0 pointer-events-none"
+        }`}
+        onClick={() => setSidebarOpen(false)}
+      />
 
       {/* Sidebar */}
       <aside
-        className={`
-          fixed inset-y-0 left-0 z-50 w-64 bg-white border-r border-gray-200
-          transform transition-transform duration-200 ease-in-out
-          lg:translate-x-0 lg:static lg:inset-0
-          ${sidebarOpen ? "translate-x-0" : "-translate-x-full"}
-        `}
+        className={`fixed inset-y-0 left-0 z-[70] w-64 bg-white border-r border-gray-200 transform transition-transform duration-300 ease-in-out lg:translate-x-0 lg:static lg:inset-0 ${
+          sidebarOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"
+        }`}
       >
         <div className="flex h-full flex-col">
           {/* Logo */}
           <div className="flex h-16 items-center gap-3 px-6 border-b">
-            <Link href="/" className="flex items-center gap-3">
-              <Image 
-                src="/assets/logo.png" 
-                alt="Zapta" 
-                width={56} 
+            <Link
+              href="/"
+              className="flex items-center gap-3"
+              onClick={() => setSidebarOpen(false)}
+            >
+              <Image
+                src="/assets/logo.png"
+                alt="Zapta"
+                width={56}
                 height={56}
                 className="h-14 w-14"
               />
-              <span className="text-2xl font-bold">Zapta</span>
+              <span className="text-2xl font-bold pt-4">Zapta</span>
             </Link>
-            <button
-              onClick={() => setSidebarOpen(false)}
-              className="ml-auto lg:hidden"
-            >
-              <X className="w-5 h-5" />
-            </button>
           </div>
 
           {/* Navigation */}
@@ -168,13 +198,25 @@ export default function DashboardLayoutClient({
       {/* Main content */}
       <div className="flex flex-1 flex-col overflow-hidden">
         {/* Top bar */}
-        <header className="flex h-16 items-center gap-4 border-b bg-white px-6">
-          <button
-            onClick={() => setSidebarOpen(true)}
-            className="lg:hidden"
+        <header className="flex h-16 items-center gap-4 border-b bg-white px-4 sm:px-6 sticky top-0 z-[100] lg:relative">
+          {/* Spacer for fixed hamburger button on mobile */}
+          <div className="lg:hidden w-12" aria-hidden="true"></div>
+
+          {/* Logo - Only on mobile - Centered */}
+          <Link 
+            href="/" 
+            className="lg:hidden absolute left-1/2 -translate-x-1/2 flex items-center gap-2"
+            onClick={() => setSidebarOpen(false)}
           >
-            <Menu className="w-6 h-6" />
-          </button>
+            <Image
+              src="/assets/logo.png"
+              alt="Zapta"
+              width={36}
+              height={36}
+              className="h-9 w-9"
+            />
+            <span className="text-lg font-bold leading-none pt-2">Zapta</span>
+          </Link>
 
           <div className="flex-1" />
 
@@ -185,11 +227,11 @@ export default function DashboardLayoutClient({
         </header>
 
         {/* Page content */}
-        <main className="flex-1 overflow-y-auto">
+        <main className="flex-1 overflow-y-auto relative z-0">
           {children}
         </main>
       </div>
-      
+
       {/* Toast notifications */}
       <Toaster />
     </div>

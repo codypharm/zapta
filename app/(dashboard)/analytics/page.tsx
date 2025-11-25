@@ -43,7 +43,7 @@ export default async function AnalyticsPage() {
 
   if (error || !metrics) {
     return (
-      <div className="p-8">
+      <div className="p-4 sm:p-6 md:p-8">
         <div className="mx-auto max-w-7xl">
           <h1 className="text-3xl font-bold tracking-tight mb-8">Analytics</h1>
           <Alert variant="destructive">
@@ -57,18 +57,18 @@ export default async function AnalyticsPage() {
   }
 
   return (
-    <div className="p-8">
-      <div className="mx-auto max-w-7xl space-y-8">
+    <div className="p-4 sm:p-6 md:p-8">
+      <div className="mx-auto max-w-7xl space-y-6 sm:space-y-8">
         {/* Header */}
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Analytics</h1>
-          <p className="text-muted-foreground mt-2">
+          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Analytics</h1>
+          <p className="text-sm sm:text-base text-muted-foreground mt-2">
             Monitor your agent performance and activity
           </p>
         </div>
 
         {/* Metric Cards */}
-        <div className="grid gap-4 md:grid-cols-3">
+        <div className="grid gap-4 grid-cols-1 sm:grid-cols-3">
           <MetricCard
             title="Total Conversations"
             value={metrics.conversations.total}
@@ -99,7 +99,7 @@ export default async function AnalyticsPage() {
         <KnowledgeBaseStats metrics={metrics.knowledgeBase} />
 
         {/* Integration & Webhook Analytics */}
-        <div className="grid gap-4 md:grid-cols-2">
+        <div className="grid gap-4 grid-cols-1 md:grid-cols-2">
           <IntegrationUsage metrics={metrics.integrations} />
           <WebhookActivity metrics={metrics.webhooks} />
         </div>

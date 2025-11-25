@@ -126,11 +126,11 @@ export function AgentCard({ agent, conversationCount = 0 }: AgentCardProps) {
           </div>
 
           {/* Title & Description */}
-          <div>
-            <CardTitle className="text-xl mb-2 group-hover:text-primary transition-colors">
+          <div className="min-w-0">
+            <CardTitle className="text-lg sm:text-xl mb-2 group-hover:text-primary transition-colors truncate" title={agent.name}>
               {agent.name}
             </CardTitle>
-            <CardDescription className="line-clamp-2">
+            <CardDescription className="line-clamp-2 text-sm">
               {agent.description}
             </CardDescription>
           </div>
@@ -138,13 +138,13 @@ export function AgentCard({ agent, conversationCount = 0 }: AgentCardProps) {
 
         <CardContent className="space-y-4">
           {/* Agent Details */}
-          <div className="flex items-center gap-4 text-sm">
-            <div className="flex items-center gap-1.5 text-muted-foreground">
+          <div className="flex items-center gap-2 sm:gap-4 text-xs sm:text-sm min-w-0">
+            <div className="flex items-center gap-1.5 text-muted-foreground shrink-0">
               <Sparkles className="w-3.5 h-3.5" />
-              <span className="font-medium">{modelLabel}</span>
+              <span className="font-medium truncate">{modelLabel}</span>
             </div>
-            <div className="h-4 w-px bg-border" />
-            <span className="text-muted-foreground capitalize">{agent.type}</span>
+            <div className="h-4 w-px bg-border shrink-0" />
+            <span className="text-muted-foreground capitalize truncate">{agent.type}</span>
           </div>
 
           {/* Usage Stats */}
@@ -158,10 +158,11 @@ export function AgentCard({ agent, conversationCount = 0 }: AgentCardProps) {
             <Button asChild className="flex-1" size="sm">
               <Link href={`/agents/${agent.id}`}>
                 <PlayCircle className="w-3.5 h-3.5 mr-1.5" />
-                Test
+                <span className="hidden xs:inline sm:inline">Test</span>
+                <span className="inline xs:hidden sm:hidden">Chat</span>
               </Link>
             </Button>
-            <Button asChild variant="outline" size="sm">
+            <Button asChild variant="outline" size="sm" className="shrink-0">
               <Link href={`/agents/${agent.id}/edit`}>
                 <Edit className="w-3.5 h-3.5" />
               </Link>

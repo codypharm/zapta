@@ -34,7 +34,7 @@ export default async function AgentDetailPage({ params }: { params: Promise<{ id
 
   if (error || !agent) {
     return (
-      <div className="p-8">
+      <div className="p-4 sm:p-6 md:p-8">
         <Alert variant="destructive">
           <AlertDescription>Agent not found</AlertDescription>
         </Alert>
@@ -45,7 +45,7 @@ export default async function AgentDetailPage({ params }: { params: Promise<{ id
   return (
     <div className="flex flex-col h-[calc(100vh-4rem)]">
       {/* Header */}
-      <div className="border-b bg-white p-6">
+      <div className="border-b bg-white p-4 sm:p-6">
         <div className="max-w-7xl mx-auto">
           <Button
             variant="ghost"
@@ -58,15 +58,15 @@ export default async function AgentDetailPage({ params }: { params: Promise<{ id
               Back to Agents
             </Link>
           </Button>
-          <div className="flex items-start justify-between">
-            <div>
-              <h1 className="text-3xl font-bold tracking-tight">{agent.name}</h1>
-              <p className="text-muted-foreground mt-2">{agent.description}</p>
-              <div className="flex items-center gap-4 mt-4 text-sm">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+            <div className="flex-1 min-w-0">
+              <h1 className="text-2xl sm:text-3xl font-bold tracking-tight truncate">{agent.name}</h1>
+              <p className="text-sm sm:text-base text-muted-foreground mt-2">{agent.description}</p>
+              <div className="flex flex-wrap items-center gap-2 sm:gap-4 mt-3 sm:mt-4 text-xs sm:text-sm">
                 <span className="capitalize">
                   <strong>Type:</strong> {agent.type}
                 </span>
-                <span>
+                <span className="truncate">
                   <strong>Model:</strong> {agent.config?.model || "Not set"}
                 </span>
                 <span className={`px-2 py-1 rounded-full text-xs font-medium ${
@@ -78,29 +78,29 @@ export default async function AgentDetailPage({ params }: { params: Promise<{ id
                 </span>
               </div>
             </div>
-            <div className="flex gap-2">
+            <div className="flex flex-wrap gap-2 shrink-0">
               <Button asChild variant="outline" size="sm">
                 <Link href={`/conversations?agent=${agent.id}`}>
-                  <MessageSquare className="w-4 h-4 mr-2" />
-                  Conversations
+                  <MessageSquare className="w-4 h-4 sm:mr-2" />
+                  <span className="hidden sm:inline">Conversations</span>
                 </Link>
               </Button>
               <Button asChild variant="outline" size="sm">
                 <Link href={`/agents/${agent.id}/knowledge`}>
-                  <FileText className="w-4 h-4 mr-2" />
-                  Knowledge
+                  <FileText className="w-4 h-4 sm:mr-2" />
+                  <span className="hidden sm:inline">Knowledge</span>
                 </Link>
               </Button>
               <Button asChild variant="outline" size="sm">
                 <Link href={`/agents/${agent.id}/widget`}>
-                  <Code2 className="w-4 h-4 mr-2" />
-                  Widget
+                  <Code2 className="w-4 h-4 sm:mr-2" />
+                  <span className="hidden sm:inline">Widget</span>
                 </Link>
               </Button>
               <Button asChild variant="outline" size="sm">
                 <Link href={`/agents/${agent.id}/edit`}>
-                  <Edit className="w-4 h-4 mr-2" />
-                  Edit
+                  <Edit className="w-4 h-4 sm:mr-2" />
+                  <span className="hidden sm:inline">Edit</span>
                 </Link>
               </Button>
             </div>
@@ -111,14 +111,14 @@ export default async function AgentDetailPage({ params }: { params: Promise<{ id
       {/* Chat Area */}
       <div className="flex-1 overflow-hidden bg-muted/30 relative">
         {/* Knowledge Base Prompt - absolute positioned overlay */}
-        <div className="absolute top-0 left-0 right-0 z-10 p-6">
+        <div className="absolute top-0 left-0 right-0 z-10 p-4 sm:p-6">
           <div className="max-w-4xl mx-auto">
             <KnowledgeBasePrompt agentId={agent.id} />
           </div>
         </div>
-        
+
         {/* Chat Interface - original full layout */}
-        <div className="h-full max-w-4xl mx-auto flex flex-col">
+        <div className="h-full max-w-4xl mx-auto flex flex-col px-2 sm:px-0">
           <AgentChat agentId={agent.id} agentStatus={agent.status} />
         </div>
       </div>

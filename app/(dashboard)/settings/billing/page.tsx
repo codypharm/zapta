@@ -37,12 +37,12 @@ export default async function BillingPage() {
   const planPrice = getPlanPrice(subscription.plan_id);
 
   return (
-    <div className="p-8">
-      <div className="mx-auto max-w-4xl space-y-8">
+    <div className="p-4 sm:p-6 md:p-8">
+      <div className="mx-auto max-w-4xl space-y-6 sm:space-y-8">
         {/* Header */}
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Billing & Usage</h1>
-          <p className="text-muted-foreground mt-2">
+          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Billing & Usage</h1>
+          <p className="text-sm sm:text-base text-muted-foreground mt-2">
             Manage your subscription and monitor your usage
           </p>
         </div>
@@ -54,29 +54,29 @@ export default async function BillingPage() {
             <CardDescription>Your active subscription details</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="flex justify-between items-start">
-              <div>
-                <div className="flex items-center gap-2 mb-1">
-                  <h3 className="text-2xl font-bold capitalize">
+            <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-4">
+              <div className="flex-1">
+                <div className="flex flex-wrap items-center gap-2 mb-1">
+                  <h3 className="text-xl sm:text-2xl font-bold capitalize">
                     {PLAN_NAMES[subscription.plan_id as keyof typeof PLAN_NAMES]}
                   </h3>
                   <Badge variant={subscription.status === 'active' ? 'default' : 'secondary'}>
                     {subscription.status}
                   </Badge>
                 </div>
-                <p className="text-muted-foreground">
+                <p className="text-sm sm:text-base text-muted-foreground">
                   {planPrice > 0 ? `$${planPrice}/month` : 'Free forever'}
                 </p>
                 {subscription.current_period_end && (
-                  <p className="text-sm text-muted-foreground mt-1">
-                    {subscription.cancel_at_period_end 
+                  <p className="text-xs sm:text-sm text-muted-foreground mt-1">
+                    {subscription.cancel_at_period_end
                       ? `Cancels on ${new Date(subscription.current_period_end).toLocaleDateString()}`
                       : `Renews on ${new Date(subscription.current_period_end).toLocaleDateString()}`
                     }
                   </p>
                 )}
               </div>
-              <div className="flex gap-2">
+              <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
                 {subscription.plan_id !== 'enterprise' && (
                   <UpgradeButton currentPlan={subscription.plan_id} />
                 )}
@@ -194,15 +194,15 @@ export default async function BillingPage() {
         {/* Upgrade CTA if on free plan */}
         {subscription.plan_id === 'free' && (
           <Card className="border-primary bg-primary/5">
-            <CardContent className="py-6">
-              <div className="flex items-center justify-between">
+            <CardContent className="py-4 sm:py-6">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                 <div>
-                  <h3 className="font-semibold mb-1">Upgrade to unlock more</h3>
-                  <p className="text-sm text-muted-foreground">
+                  <h3 className="font-semibold mb-1 text-base sm:text-lg">Upgrade to unlock more</h3>
+                  <p className="text-xs sm:text-sm text-muted-foreground">
                     Get access to all AI models, more messages, and premium features
                   </p>
                 </div>
-                <Button asChild>
+                <Button asChild className="w-full sm:w-auto">
                   <Link href="/pricing">View Plans</Link>
                 </Button>
               </div>

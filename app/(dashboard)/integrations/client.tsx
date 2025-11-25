@@ -117,16 +117,18 @@ export function IntegrationsClient({
       </div>
 
       <Tabs defaultValue="all" className="w-full">
-        <TabsList className="mb-6">
-          <TabsTrigger value="all">📊 All</TabsTrigger>
-          <TabsTrigger value="email">📧 Email</TabsTrigger>
-          <TabsTrigger value="calendar">📅 Calendar</TabsTrigger>
-          <TabsTrigger value="payment">💳 Payment</TabsTrigger>
-          <TabsTrigger value="sms">📱 SMS</TabsTrigger>
-          <TabsTrigger value="crm">🎯 CRM</TabsTrigger>
-          <TabsTrigger value="slack">💬 Slack</TabsTrigger>
-          <TabsTrigger value="webhook">🔗 Webhooks</TabsTrigger>
-        </TabsList>
+        <div className="overflow-x-auto pb-2">
+          <TabsList className="mb-6 flex-wrap sm:flex-nowrap inline-flex min-w-full sm:min-w-0">
+            <TabsTrigger value="all" className="whitespace-nowrap">📊 All</TabsTrigger>
+            <TabsTrigger value="email" className="whitespace-nowrap">📧 Email</TabsTrigger>
+            <TabsTrigger value="calendar" className="whitespace-nowrap">📅 Calendar</TabsTrigger>
+            <TabsTrigger value="payment" className="whitespace-nowrap">💳 Payment</TabsTrigger>
+            <TabsTrigger value="sms" className="whitespace-nowrap">📱 SMS</TabsTrigger>
+            <TabsTrigger value="crm" className="whitespace-nowrap">🎯 CRM</TabsTrigger>
+            <TabsTrigger value="slack" className="whitespace-nowrap">💬 Slack</TabsTrigger>
+            <TabsTrigger value="webhook" className="whitespace-nowrap">🔗 Webhooks</TabsTrigger>
+          </TabsList>
+        </div>
 
         <TabsContent value="all" className="space-y-6">
           <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">

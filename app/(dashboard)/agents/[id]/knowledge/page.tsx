@@ -94,7 +94,7 @@ export default function AgentKnowledgePage({
 
   if (loading) {
     return (
-      <div className="p-8">
+      <div className="p-4 sm:p-6 md:p-8">
         <div className="mx-auto max-w-7xl">
           <div className="flex items-center justify-center py-12">
             <div className="flex items-center gap-2 text-muted-foreground">
@@ -109,7 +109,7 @@ export default function AgentKnowledgePage({
 
   if (!agent) {
     return (
-      <div className="p-8">
+      <div className="p-4 sm:p-6 md:p-8">
         <div className="mx-auto max-w-7xl">
           <div className="flex items-center justify-center py-12">
             <div className="text-muted-foreground">Agent not found</div>
@@ -120,7 +120,7 @@ export default function AgentKnowledgePage({
   }
 
   return (
-    <div className="p-8">
+    <div className="p-4 sm:p-6 md:p-8">
       <div className="mx-auto max-w-7xl space-y-6">
         <div className="flex items-center justify-between">
           <div>

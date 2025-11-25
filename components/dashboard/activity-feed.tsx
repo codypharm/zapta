@@ -87,13 +87,13 @@ export function ActivityFeed({ activities }: ActivityFeedProps) {
                     <Icon className="w-5 h-5" />
                   </div>
                   <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2">
-                      <p className="font-medium text-sm">{activity.title}</p>
-                      <Badge variant="outline" className="text-xs capitalize">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <p className="font-medium text-sm truncate">{activity.title}</p>
+                      <Badge variant="outline" className="text-xs capitalize shrink-0">
                         {activity.type}
                       </Badge>
                     </div>
-                    <p className="text-sm text-muted-foreground truncate mt-0.5">
+                    <p className="text-xs sm:text-sm text-muted-foreground truncate mt-0.5">
                       {activity.description}
                     </p>
                     <p className="text-xs text-muted-foreground mt-1">

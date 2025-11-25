@@ -5,6 +5,8 @@
 
 import { Metadata } from "next";
 import Link from "next/link";
+import { redirect } from "next/navigation";
+import { createServerClient } from "@/lib/supabase/server";
 import { SignupForm } from "@/components/auth/signup-form";
 
 export const metadata: Metadata = {
@@ -12,7 +14,18 @@ export const metadata: Metadata = {
   description: "Create your Zapta account",
 };
 
-export default function SignupPage() {
+export default async function SignupPage() {
+  // Check if user is already logged in
+  const supabase = await createServerClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  // Redirect to dashboard if already authenticated
+  if (user) {
+    redirect("/dashboard");
+  }
+
   return (
     <div className="flex min-h-screen items-center justify-center bg-muted/30 p-4">
       <div className="w-full max-w-md space-y-6">

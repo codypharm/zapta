@@ -115,53 +115,53 @@ export default async function PricingPage() {
       
       {/* Main Content */}
       {/* Hero Section */}
-      <section className="py-20 text-center pt-28">{/* Added pt-28 for header spacing */}
+      <section className="py-12 sm:py-16 md:py-20 text-center pt-20 sm:pt-24 md:pt-28">
         <div className="container mx-auto px-4">
-          <h1 className="text-4xl md:text-5xl font-bold tracking-tight mb-4">
+          <h1 className="text-3xl sm:text-4xl md:text-5xl font-bold tracking-tight mb-3 sm:mb-4">
             Simple, Transparent Pricing
           </h1>
-          <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
+          <p className="text-lg sm:text-xl text-muted-foreground max-w-2xl mx-auto px-4">
             Choose the plan that's right for you. Start with the free plan and upgrade anytime.
           </p>
         </div>
       </section>
 
       {/* Pricing Cards */}
-      <section className="pb-20">
+      <section className="pb-12 sm:pb-16 md:pb-20">
         <div className="container mx-auto px-4">
-          <div className="grid gap-8 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 max-w-7xl mx-auto">
+          <div className="grid gap-6 sm:gap-8 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 max-w-7xl mx-auto">
             {plans.map((plan) => (
               <Card
                 key={plan.id}
                 className={`relative ${
                   plan.featured
-                    ? 'border-primary shadow-lg scale-105'
+                    ? 'border-primary shadow-lg sm:scale-105'
                     : 'border-border'
                 }`}
               >
                 {plan.featured && (
-                  <Badge className="absolute -top-3 left-1/2 -translate-x-1/2">
+                  <Badge className="absolute -top-3 left-1/2 -translate-x-1/2 z-10">
                     Most Popular
                   </Badge>
                 )}
-                <CardHeader>
-                  <CardTitle>{plan.name}</CardTitle>
-                  <CardDescription>{plan.description}</CardDescription>
-                  <div className="mt-4">
-                    <span className="text-4xl font-bold">${plan.price}</span>
-                    <span className="text-muted-foreground">/month</span>
+                <CardHeader className="pb-4 sm:pb-6">
+                  <CardTitle className="text-xl sm:text-2xl">{plan.name}</CardTitle>
+                  <CardDescription className="text-sm sm:text-base">{plan.description}</CardDescription>
+                  <div className="mt-3 sm:mt-4">
+                    <span className="text-3xl sm:text-4xl font-bold">${plan.price}</span>
+                    <span className="text-sm sm:text-base text-muted-foreground">/month</span>
                   </div>
                 </CardHeader>
-                <CardContent className="space-y-4">
-                  <ul className="space-y-2">
+                <CardContent className="space-y-4 pt-0">
+                  <ul className="space-y-2 sm:space-y-2.5">
                     {plan.features.map((feature, i) => (
-                      <li key={i} className="flex items-start gap-2 text-sm">
-                        <Check className="w-4 h-4 text-primary mt-0.5 shrink-0" />
+                      <li key={i} className="flex items-start gap-2 text-xs sm:text-sm">
+                        <Check className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-primary mt-0.5 shrink-0" />
                         <span>{feature}</span>
                       </li>
                     ))}
                   </ul>
-                  <Button asChild className="w-full" variant={plan.featured ? 'default' : 'outline'}>
+                  <Button asChild className="w-full mt-4 sm:mt-6" variant={plan.featured ? 'default' : 'outline'}>
                     <Link href={plan.href}>{plan.cta}</Link>
                   </Button>
                 </CardContent>
@@ -172,39 +172,39 @@ export default async function PricingPage() {
       </section>
 
       {/* FAQ Section */}
-      <section className="py-20 bg-muted/50">
+      <section className="py-12 sm:py-16 md:py-20 bg-muted/50">
         <div className="container mx-auto px-4 max-w-4xl">
-          <h2 className="text-3xl font-bold text-center mb-12">
+          <h2 className="text-2xl sm:text-3xl font-bold text-center mb-8 sm:mb-12">
             Frequently Asked Questions
           </h2>
-          <div className="space-y-6">
+          <div className="space-y-5 sm:space-y-6">
             <div>
-              <h3 className="font-semibold mb-2">Can I change plans later?</h3>
-              <p className="text-muted-foreground">
+              <h3 className="font-semibold mb-2 text-base sm:text-lg">Can I change plans later?</h3>
+              <p className="text-sm sm:text-base text-muted-foreground">
                 Yes! You can upgrade or downgrade your plan at any time. Changes take effect immediately, and we'll prorate any charges.
               </p>
             </div>
             <div>
-              <h3 className="font-semibold mb-2">What payment methods do you accept?</h3>
-              <p className="text-muted-foreground">
+              <h3 className="font-semibold mb-2 text-base sm:text-lg">What payment methods do you accept?</h3>
+              <p className="text-sm sm:text-base text-muted-foreground">
                 We accept all major credit cards (Visa, Mastercard, American Express) via Stripe.
               </p>
             </div>
             <div>
-              <h3 className="font-semibold mb-2">Can I try before paying?</h3>
-              <p className="text-muted-foreground">
+              <h3 className="font-semibold mb-2 text-base sm:text-lg">Can I try before paying?</h3>
+              <p className="text-sm sm:text-base text-muted-foreground">
                 Yes! Our Free plan is available forever with no credit card required. You can upgrade to a paid plan anytime to unlock more features and higher limits.
               </p>
             </div>
             <div>
-              <h3 className="font-semibold mb-2">What happens if I exceed my message limit?</h3>
-              <p className="text-muted-foreground">
+              <h3 className="font-semibold mb-2 text-base sm:text-lg">What happens if I exceed my message limit?</h3>
+              <p className="text-sm sm:text-base text-muted-foreground">
                 We'll send you a notification when you reach 80% of your limit. If you exceed your limit, you'll be prompted to upgrade to continue using your agents.
               </p>
             </div>
             <div>
-              <h3 className="font-semibold mb-2">Can I cancel anytime?</h3>
-              <p className="text-muted-foreground">
+              <h3 className="font-semibold mb-2 text-base sm:text-lg">Can I cancel anytime?</h3>
+              <p className="text-sm sm:text-base text-muted-foreground">
                 Yes, you can cancel your subscription at any time. You'll continue to have access until the end of your billing period.
               </p>
             </div>
@@ -213,15 +213,15 @@ export default async function PricingPage() {
       </section>
 
       {/* CTA Section */}
-      <section className="py-20 text-center">
+      <section className="py-12 sm:py-16 md:py-20 text-center">
         <div className="container mx-auto px-4">
-          <h2 className="text-3xl font-bold mb-4">
+          <h2 className="text-2xl sm:text-3xl font-bold mb-3 sm:mb-4">
             Ready to get started?
           </h2>
-          <p className="text-xl text-muted-foreground mb-8 max-w-2xl mx-auto">
+          <p className="text-lg sm:text-xl text-muted-foreground mb-6 sm:mb-8 max-w-2xl mx-auto">
             Join thousands of teams already using Zapta to automate their workflows
           </p>
-          <Button asChild size="lg">
+          <Button asChild size="lg" className="w-full sm:w-auto">
             <Link href="/signup">Start Free Trial →</Link>
           </Button>
         </div>

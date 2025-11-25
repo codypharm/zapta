@@ -659,22 +659,23 @@ export function IntegrationDialog({
 
           {/* Footer - Hide for OAuth integrations */}
           {formFields.length > 0 && (
-            <div className="flex justify-end space-x-2 border-t pt-4 mt-6">
+            <div className="flex flex-col sm:flex-row sm:justify-end gap-2 sm:space-x-2 sm:gap-0 border-t pt-4 mt-6">
               <AlertDialogCancel onClick={(e) => {
                 e.preventDefault();
                 onClose();  
-              }} className="h-9">Cancel</AlertDialogCancel>
+              }} className="h-9 w-full sm:w-auto">Cancel</AlertDialogCancel>
               {isEditMode && (
                 <Button
                   type="button"
                   variant="outline"
                   onClick={handleTestConnection}
                   disabled={isTesting}
+                  className="w-full sm:w-auto"
                 >
                   {isTesting ? "Testing..." : "Test Connection"}
                 </Button>
               )}
-              <Button type="submit" disabled={isLoading} form="integration-form">
+              <Button type="submit" disabled={isLoading} form="integration-form" className="w-full sm:w-auto">
                 {isLoading
                   ? "Saving..."
                   : isEditMode

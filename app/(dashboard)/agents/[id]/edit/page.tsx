@@ -30,7 +30,7 @@ export default async function AgentEditPage({ params }: { params: Promise<{ id: 
 
   if (error || !agent) {
     return (
-      <div className="p-8">
+      <div className="p-4 sm:p-6 md:p-8">
         <Alert variant="destructive">
           <AlertDescription>Agent not found</AlertDescription>
         </Alert>

@@ -31,7 +31,7 @@ export function MarketingHeader({ isAuthenticated }: MarketingHeaderProps) {
               height={56}
               className="h-12 w-12 sm:h-14 sm:w-14"
             />
-            <span className="text-2xl sm:text-3xl font-bold text-foreground">Zapta</span>
+            <span className="text-2xl sm:text-3xl font-bold text-foreground leading-none">Zapta</span>
           </Link>
 
           {/* Desktop Navigation Links */}
@@ -77,13 +77,13 @@ export function MarketingHeader({ isAuthenticated }: MarketingHeaderProps) {
           {/* Mobile Menu Button */}
           <button
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-            className="md:hidden p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+            className="md:hidden p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors flex items-center justify-center self-center"
             aria-label="Toggle menu"
           >
             {mobileMenuOpen ? (
               <X className="w-6 h-6" />
             ) : (
-              <Menu className="w-6 h-6" />
+              <Menu className="w-6 h-6 " />
             )}
           </button>
         </div>

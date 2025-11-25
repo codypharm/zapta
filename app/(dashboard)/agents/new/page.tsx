@@ -221,8 +221,8 @@ export default function CreateAgentPage() {
   };
 
   return (
-    <div className="p-8">
-      <div className="mx-auto max-w-3xl space-y-8">
+    <div className="p-4 sm:p-6 md:p-8">
+      <div className="mx-auto max-w-3xl space-y-6 sm:space-y-8">
         {/* Header */}
         <div>
           <Button
@@ -234,20 +234,20 @@ export default function CreateAgentPage() {
             <ArrowLeft className="w-4 h-4 mr-2" />
             Back to Agents
           </Button>
-          <h1 className="text-3xl font-bold tracking-tight">Create New Agent</h1>
-          <p className="text-muted-foreground mt-2">
+          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Create New Agent</h1>
+          <p className="text-sm sm:text-base text-muted-foreground mt-2">
             Follow the steps to configure your AI agent
           </p>
         </div>
 
         {/* Step Indicator */}
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between overflow-x-auto pb-2">
           {[1, 2, 3, 4].map((step) => (
-            <div key={step} className="flex items-center flex-1">
-              <div className="flex items-center">
+            <div key={step} className="flex items-center flex-1 min-w-0">
+              <div className="flex items-center min-w-0">
                 <div
                   className={`
-                    w-10 h-10 rounded-full flex items-center justify-center font-semibold
+                    w-8 h-8 sm:w-10 sm:h-10 rounded-full flex items-center justify-center font-semibold text-sm sm:text-base shrink-0
                     ${
                       step < currentStep
                         ? "bg-primary text-white"
@@ -257,10 +257,10 @@ export default function CreateAgentPage() {
                     }
                   `}
                 >
-                  {step < currentStep ? <Check className="w-5 h-5" /> : step}
+                  {step < currentStep ? <Check className="w-4 h-4 sm:w-5 sm:h-5" /> : step}
                 </div>
                 <span
-                  className={`ml-2 text-sm font-medium ${
+                  className={`ml-1 sm:ml-2 text-xs sm:text-sm font-medium truncate ${
                     step <= currentStep ? "text-foreground" : "text-muted-foreground"
                   }`}
                 >
@@ -269,7 +269,7 @@ export default function CreateAgentPage() {
               </div>
               {step < 4 && (
                 <div
-                  className={`flex-1 h-1 mx-4 ${
+                  className={`flex-1 h-1 mx-2 sm:mx-4 ${
                     step < currentStep ? "bg-primary" : "bg-gray-200"
                   }`}
                 />
@@ -307,13 +307,13 @@ export default function CreateAgentPage() {
 
               <div className="space-y-2">
                 <Label>Agent Type</Label>
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                   {AGENT_TYPES.map((type) => (
                     <button
                       key={type.value}
                       onClick={() => updateFormData("type", type.value)}
                       className={`
-                        p-4 rounded-lg border-2 text-left transition-all
+                        p-3 sm:p-4 rounded-lg border-2 text-left transition-all
                         ${
                           formData.type === type.value
                             ? "border-primary bg-primary/5"
@@ -321,8 +321,8 @@ export default function CreateAgentPage() {
                         }
                       `}
                     >
-                      <div className="font-semibold">{type.label}</div>
-                      <div className="text-sm text-muted-foreground mt-1">
+                      <div className="font-semibold text-sm sm:text-base">{type.label}</div>
+                      <div className="text-xs sm:text-sm text-muted-foreground mt-1">
                         {type.description}
                       </div>
                     </button>
@@ -370,7 +370,7 @@ Example: You are a helpful customer support agent. Your goal is to assist custom
                 </p>
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="model">AI Model</Label>
                   <Select
@@ -618,23 +618,24 @@ Example: You are a helpful customer support agent. Your goal is to assist custom
         )}
 
         {/* Navigation Buttons */}
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between gap-3">
           <Button
             variant="outline"
             onClick={handleBack}
             disabled={currentStep === 1 || loading}
+            className="w-full sm:w-auto"
           >
             <ArrowLeft className="w-4 h-4 mr-2" />
             Back
           </Button>
 
           {currentStep < 4 ? (
-            <Button onClick={handleNext}>
+            <Button onClick={handleNext} className="w-full sm:w-auto">
               Next
               <ArrowRight className="w-4 h-4 ml-2" />
             </Button>
           ) : (
-            <Button onClick={handleSubmit} disabled={loading}>
+            <Button onClick={handleSubmit} disabled={loading} className="w-full sm:w-auto">
               {loading ? "Creating..." : "Create Agent"}
             </Button>
           )}

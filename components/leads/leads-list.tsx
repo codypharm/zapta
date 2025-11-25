@@ -87,17 +87,17 @@ export function LeadsList({ agents }: LeadsListProps) {
   };
 
   return (
-    <div className="p-8">
-      <div className="mx-auto max-w-7xl space-y-8">
+    <div className="p-4 sm:p-6 md:p-8">
+      <div className="mx-auto max-w-7xl space-y-6 sm:space-y-8">
         {/* Header */}
-        <div className="flex items-start justify-between">
+        <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
           <div>
-            <h1 className="text-3xl font-bold tracking-tight">Leads</h1>
-            <p className="text-muted-foreground mt-2">
+            <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Leads</h1>
+            <p className="text-sm sm:text-base text-muted-foreground mt-2">
               Manage contact information collected from visitors
             </p>
           </div>
-          <Button onClick={handleExport} disabled={exporting || leads.length === 0} variant="outline">
+          <Button onClick={handleExport} disabled={exporting || leads.length === 0} variant="outline" className="w-full sm:w-auto">
             <Download className="w-4 h-4 mr-2" />
             {exporting ? "Exporting..." : "Export CSV"}
           </Button>
@@ -179,7 +179,7 @@ export function LeadsList({ agents }: LeadsListProps) {
               {leads.length} lead{leads.length !== 1 ? "s" : ""} found
             </div>
 
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+            <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
               {leads.map((lead) => (
                 <Card
                   key={lead.id}
@@ -187,20 +187,20 @@ export function LeadsList({ agents }: LeadsListProps) {
                   onClick={() => router.push(`/leads/${lead.id}`)}
                 >
                   <CardHeader>
-                    <div className="flex items-start justify-between">
-                      <div className="flex-1">
-                        <CardTitle className="text-lg flex items-center gap-2">
-                          <Users className="w-4 h-4 text-primary" />
-                          {lead.name || "Anonymous"}
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex-1 min-w-0">
+                        <CardTitle className="text-base sm:text-lg flex items-center gap-2">
+                          <Users className="w-4 h-4 text-primary shrink-0" />
+                          <span className="truncate">{lead.name || "Anonymous"}</span>
                         </CardTitle>
                         {lead.agent && (
-                          <CardDescription className="mt-1">
+                          <CardDescription className="mt-1 text-sm truncate" title={`via ${lead.agent.name}`}>
                             via {lead.agent.name}
                           </CardDescription>
                         )}
                       </div>
                       {lead.conversation_id && (
-                        <Badge variant="outline" className="text-xs">
+                        <Badge variant="outline" className="text-xs shrink-0">
                           Has chat
                         </Badge>
                       )}
@@ -209,28 +209,28 @@ export function LeadsList({ agents }: LeadsListProps) {
 
                   <CardContent className="space-y-2">
                     {lead.email && (
-                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                      <div className="flex items-center gap-2 text-xs sm:text-sm text-muted-foreground min-w-0">
                         <Mail className="w-4 h-4 flex-shrink-0" />
-                        <span className="truncate">{lead.email}</span>
+                        <span className="truncate" title={lead.email}>{lead.email}</span>
                       </div>
                     )}
 
                     {lead.phone && (
-                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                      <div className="flex items-center gap-2 text-xs sm:text-sm text-muted-foreground">
                         <Phone className="w-4 h-4 flex-shrink-0" />
-                        <span>{lead.phone}</span>
+                        <span className="truncate">{lead.phone}</span>
                       </div>
                     )}
 
                     {lead.company && (
-                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                      <div className="flex items-center gap-2 text-xs sm:text-sm text-muted-foreground min-w-0">
                         <Building className="w-4 h-4 flex-shrink-0" />
-                        <span className="truncate">{lead.company}</span>
+                        <span className="truncate" title={lead.company}>{lead.company}</span>
                       </div>
                     )}
 
                     <div className="flex items-center gap-2 text-xs text-muted-foreground pt-2 border-t">
-                      <Calendar className="w-3 h-3" />
+                      <Calendar className="w-3 h-3 shrink-0" />
                       <span>{formatDate(lead.created_at)}</span>
                     </div>
                   </CardContent>

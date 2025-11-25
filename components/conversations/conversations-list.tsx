@@ -85,12 +85,12 @@ export function ConversationsList({ agents }: ConversationsListProps) {
   };
 
   return (
-    <div className="p-8">
-      <div className="mx-auto max-w-7xl space-y-8">
+    <div className="p-4 sm:p-6 md:p-8">
+      <div className="mx-auto max-w-7xl space-y-6 sm:space-y-8">
         {/* Header */}
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Conversations</h1>
-          <p className="text-muted-foreground mt-2">
+          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Conversations</h1>
+          <p className="text-sm sm:text-base text-muted-foreground mt-2">
             View and manage all conversations across your agents
           </p>
         </div>
@@ -179,17 +179,17 @@ export function ConversationsList({ agents }: ConversationsListProps) {
               >
                 <CardHeader>
                   <div className="flex items-start justify-between">
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2 mb-2">
-                        <Bot className="w-4 h-4 text-primary" />
-                        <CardTitle className="text-lg">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-2 flex-wrap">
+                        <Bot className="w-4 h-4 text-primary shrink-0" />
+                        <CardTitle className="text-base sm:text-lg truncate" title={conversation.agent?.name || "Unknown Agent"}>
                           {conversation.agent?.name || "Unknown Agent"}
                         </CardTitle>
-                        <Badge variant="outline" className="capitalize">
+                        <Badge variant="outline" className="capitalize text-xs shrink-0">
                           {conversation.agent?.type || "unknown"}
                         </Badge>
                       </div>
-                      <CardDescription className="line-clamp-2">
+                      <CardDescription className="line-clamp-2 text-sm">
                         {getLastMessage(conversation.messages)}
                       </CardDescription>
                     </div>
@@ -197,17 +197,17 @@ export function ConversationsList({ agents }: ConversationsListProps) {
                 </CardHeader>
 
                 <CardContent>
-                  <div className="flex items-center gap-6 text-sm text-muted-foreground">
+                  <div className="flex flex-wrap items-center gap-3 sm:gap-6 text-xs sm:text-sm text-muted-foreground">
                     <div className="flex items-center gap-1.5">
-                      <MessageSquare className="w-4 h-4" />
+                      <MessageSquare className="w-4 h-4 shrink-0" />
                       <span>{getMessageCount(conversation.messages)} messages</span>
                     </div>
                     <div className="flex items-center gap-1.5">
-                      <Calendar className="w-4 h-4" />
+                      <Calendar className="w-4 h-4 shrink-0" />
                       <span>{formatDate(conversation.updated_at)}</span>
                     </div>
                     {conversation.metadata?.sessionId && (
-                      <div className="text-xs font-mono">
+                      <div className="text-xs font-mono truncate">
                         Session: {conversation.metadata.sessionId.substring(0, 8)}...
                       </div>
                     )}
