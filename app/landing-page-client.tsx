@@ -352,7 +352,7 @@ export function LandingPageClient({ isAuthenticated }: LandingPageClientProps) {
                   asChild
                   variant="outline"
                   size="lg"
-                  className="border-white text-white hover:bg-white/20 text-base sm:text-lg px-6 sm:px-8 py-5 sm:py-6 rounded-xl font-semibold w-full sm:w-auto"
+                  className="border-white text-white hover:bg-white hover:text-primary text-base sm:text-lg px-6 sm:px-8 py-5 sm:py-6 rounded-xl font-semibold w-full sm:w-auto"
                 >
                   <Link href="/pricing">View Plans</Link>
                 </Button>

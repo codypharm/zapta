@@ -63,15 +63,15 @@ const AlertDialogContent = React.forwardRef<
   if (!context.open) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center">
+    <div className="fixed inset-0 z-[250] flex items-center justify-center">
       <div
-        className="fixed inset-0 bg-black/80"
+        className="fixed inset-0 z-[250]"
         onClick={() => context.onOpenChange?.(false)}
       />
       <div
         ref={ref}
         className={cn(
-          "fixed left-[50%] top-[50%] z-50 grid w-full max-w-lg translate-x-[-50%] translate-y-[-50%] gap-4 border bg-background p-6 shadow-lg duration-200 sm:rounded-lg",
+          "relative z-[251] grid w-full max-w-lg gap-4 border bg-background p-6 shadow-lg duration-200 sm:rounded-lg",
           className
         )}
         {...props}
