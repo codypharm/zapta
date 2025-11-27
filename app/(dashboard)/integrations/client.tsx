@@ -30,6 +30,7 @@ interface IntegrationsClientProps {
     type: string;
     icon: string;
     features: string[];
+    coming_soon?: boolean;
   }>;
 }
 
@@ -155,7 +156,7 @@ export function IntegrationsClient({
               return (
                 <Card
                   key={`new-${provider.id}`}
-                  className="group cursor-pointer border-2 border-dashed transition-all hover:border-primary  hover:shadow-lg"
+                  className={`group ${provider.coming_soon ? 'opacity-60' : 'cursor-pointer'} border-2 border-dashed transition-all hover:border-primary hover:shadow-lg`}
                 >
                   <CardHeader>
                     <div className="flex items-center space-x-3">
@@ -163,9 +164,16 @@ export function IntegrationsClient({
                         {provider.icon}
                       </div>
                       <div className="flex-1 min-w-0">
-                        <CardTitle className="text-base font-semibold">
-                          {provider.name}
-                        </CardTitle>
+                        <div className="flex items-center gap-2">
+                          <CardTitle className="text-base font-semibold">
+                            {provider.name}
+                          </CardTitle>
+                          {provider.coming_soon && (
+                            <Badge variant="secondary" className="text-xs">
+                              Coming Soon
+                            </Badge>
+                          )}
+                        </div>
                         <p className="text-xs text-muted-foreground line-clamp-1">
                           {provider.description}
                         </p>
@@ -176,12 +184,15 @@ export function IntegrationsClient({
                     <Button
                       className="w-full"
                       variant="outline"
+                      disabled={provider.coming_soon}
                       onClick={() => {
-                        setSelectedProvider(provider);
-                        setIsDialogOpen(true);
+                        if (!provider.coming_soon) {
+                          setSelectedProvider(provider);
+                          setIsDialogOpen(true);
+                        }
                       }}
                     >
-                      + Connect
+                      {provider.coming_soon ? 'Coming Soon' : '+ Connect'}
                     </Button>
                   </CardContent>
                 </Card>

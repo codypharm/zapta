@@ -375,6 +375,7 @@ export async function getAvailableProviders() {
       description: "Process payments, create invoices, and manage subscriptions",
       type: "payment",
       icon: "💳",
+      coming_soon: true,
       features: [
         "Payment processing",
         "Invoice creation",
@@ -406,20 +407,6 @@ export async function getAvailableProviders() {
         "Deal creation",
         "Company sync",
         "OAuth 2.0",
-      ],
-    },
-    {
-      id: "slack",
-      name: "Slack",
-      description:
-        "Connect to Slack workspaces, send messages, and respond to mentions",
-      type: "slack",
-      icon: "💬",
-      features: [
-        "Bot mentions",
-        "Channel posting",
-        "DM responses",
-        "Slash commands",
       ],
     },
     {
