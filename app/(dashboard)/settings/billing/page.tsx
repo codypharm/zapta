@@ -99,13 +99,19 @@ export default async function BillingPage() {
             <div className="space-y-2">
               <div className="flex justify-between text-sm">
                 <span className="font-medium">AI Agents</span>
-                <span className="text-muted-foreground">
+                <span className={usage.agents > planLimits.agents && planLimits.agents !== -1 ? "text-orange-600 font-semibold" : "text-muted-foreground"}>
                   {usage.agents} / {planLimits.agents === -1 ? '∞' : planLimits.agents}
                 </span>
               </div>
               <Progress 
                 value={planLimits.agents === -1 ? 0 : (usage.agents / planLimits.agents) * 100} 
+                className={usage.agents > planLimits.agents && planLimits.agents !== -1 ? "[&>div]:bg-orange-500" : ""}
               />
+              {usage.agents > planLimits.agents && planLimits.agents !== -1 && (
+                <p className="text-sm text-orange-600">
+                  ⚠️ Over limit! You can't create new agents. Upgrade your plan or delete {usage.agents - planLimits.agents} agent{usage.agents - planLimits.agents > 1 ? 's' : ''}.
+                </p>
+              )}
             </div>
 
             {/* Messages */}
@@ -130,13 +136,19 @@ export default async function BillingPage() {
             <div className="space-y-2">
               <div className="flex justify-between text-sm">
                 <span className="font-medium">Storage</span>
-                <span className="text-muted-foreground">
+                <span className={usage.storage_mb > planLimits.storage_mb ? "text-orange-600 font-semibold" : "text-muted-foreground"}>
                   {usage.storage_mb} MB / {planLimits.storage_mb} MB
                 </span>
               </div>
               <Progress 
                 value={(usage.storage_mb / planLimits.storage_mb) * 100} 
+                className={usage.storage_mb > planLimits.storage_mb ? "[&>div]:bg-orange-500" : ""}
               />
+              {usage.storage_mb > planLimits.storage_mb && (
+                <p className="text-sm text-orange-600">
+                  ⚠️ Over limit by {usage.storage_mb - planLimits.storage_mb} MB! You can't upload new files. Upgrade your plan or delete some documents.
+                </p>
+              )}
             </div>
           </CardContent>
         </Card>

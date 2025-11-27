@@ -108,9 +108,9 @@ async function DashboardContent({ params }: { params: { verified?: string } }) {
               <div className="text-center space-y-3 sm:space-y-4">
                 <h3 className="text-lg sm:text-xl font-bold">🎉 Welcome to Zapta!</h3>
                 <p className="text-sm sm:text-base text-muted-foreground max-w-lg mx-auto px-4">
-                  Get started in 3 easy steps:
+                  Get started in 4 easy steps:
                 </p>
-                <div className="grid gap-4 grid-cols-1 sm:grid-cols-3 mt-4 sm:mt-6">
+                <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 mt-4 sm:mt-6">
                   <div className="space-y-2 p-4 sm:p-0">
                     <div className="text-2xl sm:text-3xl">1️⃣</div>
                     <h4 className="font-semibold text-sm sm:text-base">Create an Agent</h4>
@@ -120,16 +120,23 @@ async function DashboardContent({ params }: { params: { verified?: string } }) {
                   </div>
                   <div className="space-y-2 p-4 sm:p-0">
                     <div className="text-2xl sm:text-3xl">2️⃣</div>
-                    <h4 className="font-semibold text-sm sm:text-base">Add Knowledge</h4>
+                    <h4 className="font-semibold text-sm sm:text-base">Start Chatting</h4>
                     <p className="text-xs sm:text-sm text-muted-foreground">
-                      Upload documents to help your agent answer questions
+                      Test your agent and see it in action
                     </p>
                   </div>
                   <div className="space-y-2 p-4 sm:p-0">
                     <div className="text-2xl sm:text-3xl">3️⃣</div>
-                    <h4 className="font-semibold text-sm sm:text-base">Start Chatting</h4>
+                    <h4 className="font-semibold text-sm sm:text-base">Add Knowledge</h4>
                     <p className="text-xs sm:text-sm text-muted-foreground">
-                      Test your agent and share with users
+                      Upload documents to improve answers
+                    </p>
+                  </div>
+                  <div className="space-y-2 p-4 sm:p-0">
+                    <div className="text-2xl sm:text-3xl">4️⃣</div>
+                    <h4 className="font-semibold text-sm sm:text-base">Connect Integrations</h4>
+                    <p className="text-xs sm:text-sm text-muted-foreground">
+                      Email, CRM, calendar, and more
                     </p>
                   </div>
                 </div>

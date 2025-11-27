@@ -14,7 +14,7 @@ import { getPlanLimits, canSendMessage, canCreateAgent } from "./plans";
 export async function incrementMessageUsage(tenantId: string): Promise<void> {
   const supabase = await createServerClient();
 
-  // Get current usage
+  // Get current usage and subscription info
   const { data: tenant } = await supabase
     .from("tenants")
     .select("usage_messages_month, usage_reset_at, subscription_plan")
@@ -25,13 +25,52 @@ export async function incrementMessageUsage(tenantId: string): Promise<void> {
     throw new Error("Tenant not found");
   }
 
-  // Check if we need to reset monthly usage
+  // Get subscription billing period (for paid plans)
+  let resetAt = tenant.usage_reset_at ? new Date(tenant.usage_reset_at) : null;
   const now = new Date();
-  const resetAt = tenant.usage_reset_at ? new Date(tenant.usage_reset_at) : null;
 
-  if (!resetAt || now > resetAt) {
-    // Reset usage and set next reset date (first of next month)
-    const nextReset = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+  // For paid plans, use Stripe billing cycle
+  if (tenant.subscription_plan !== 'free') {
+    const { data: subscription } = await supabase
+      .from("subscriptions")
+      .select("current_period_end, status")
+      .eq("tenant_id", tenantId)
+      .single();
+
+    // If subscription exists and is active, use its billing period
+    if (subscription && subscription.status === 'active' && subscription.current_period_end) {
+      resetAt = new Date(subscription.current_period_end);
+    }
+  }
+
+  // If no reset date, set to next month (calendar month for free plan)
+  if (!resetAt) {
+    resetAt = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+  }
+
+  // Check if we need to reset monthly usage
+  if (now > resetAt) {
+    // Calculate next reset date
+    let nextReset: Date;
+    
+    if (tenant.subscription_plan !== 'free') {
+      // For paid plans, get updated billing period from Stripe
+      const { data: subscription } = await supabase
+        .from("subscriptions")
+        .select("current_period_end")
+        .eq("tenant_id", tenantId)
+        .single();
+      
+      if (subscription?.current_period_end) {
+        nextReset = new Date(subscription.current_period_end);
+      } else {
+        // Fallback: add 30 days
+        nextReset = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
+      }
+    } else {
+      // Free plan: use calendar month
+      nextReset = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+    }
     
     await supabase
       .from("tenants")

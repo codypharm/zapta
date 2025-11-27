@@ -16,6 +16,8 @@ import {
   ChevronDown,
   Users,
   BarChart3,
+  Crown,
+  Zap,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -25,6 +27,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Toaster } from "@/components/ui/toaster";
+import { OverLimitBanner } from "@/components/billing/over-limit-banner";
 
 const navigation = [
   { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
@@ -46,10 +49,65 @@ export default function DashboardLayoutClient({
   const pathname = usePathname();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
+  const [userPlan, setUserPlan] = useState<string>('free');
+  const [loadingPlan, setLoadingPlan] = useState(true);
 
   useEffect(() => {
     setMounted(true);
   }, []);
+
+  // Fetch user plan
+  useEffect(() => {
+    const loadUserPlan = async () => {
+      try {
+        const { createClient } = await import("@/lib/supabase/client");
+        const supabase = createClient();
+        
+        const { data: { user: authUser } } = await supabase.auth.getUser();
+        if (!authUser) return;
+        
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('tenant_id')
+          .eq('id', authUser.id)
+          .single();
+        
+        if (profile) {
+          const { data: subscriptions } = await supabase
+            .from('subscriptions')
+            .select('plan_id, status')
+            .eq('tenant_id', profile.tenant_id)
+            .eq('status', 'active')
+            .order('created_at', { ascending: false })
+            .limit(1);
+          
+          const subscription = subscriptions?.[0];
+          
+          if (subscription) {
+            setUserPlan(subscription.plan_id || 'free');
+          } else {
+            const { data: tenant } = await supabase
+              .from('tenants')
+              .select('subscription_plan')
+              .eq('id', profile.tenant_id)
+              .single();
+            
+            if (tenant) {
+              setUserPlan(tenant.subscription_plan || 'free');
+            }
+          }
+        }
+      } catch (err) {
+        console.error('Failed to load user plan:', err);
+      } finally {
+        setLoadingPlan(false);
+      }
+    };
+    
+    if (mounted) {
+      loadUserPlan();
+    }
+  }, [mounted]);
 
   const handleLogout = async () => {
     const { logout } = await import("@/lib/auth/actions");
@@ -177,7 +235,29 @@ export default function DashboardLayoutClient({
                   <ChevronDown className="w-4 h-4 text-gray-400" />
                 </button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-56">
+              <DropdownMenuContent align="end" className="w-56 z-[200]">
+                {/* Plan Badge */}
+                <div className="px-2 py-1.5">
+                  <div className="flex items-center gap-2 px-2 py-1.5 rounded-md bg-primary/10 text-primary">
+                    <Crown className="w-4 h-4" />
+                    <span className="text-sm font-semibold capitalize">
+                      {loadingPlan ? 'Loading...' : `${userPlan} Plan`}
+                    </span>
+                  </div>
+                </div>
+                
+                {/* Billing/Upgrade Button */}
+                {!loadingPlan && (
+                  <DropdownMenuItem asChild>
+                    <Link href="/settings/billing" className="font-medium">
+                      <Zap className="w-4 h-4 mr-2" />
+                      {userPlan === 'enterprise' ? 'Manage Billing' : 'Upgrade Plan'}
+                    </Link>
+                  </DropdownMenuItem>
+                )}
+                
+                <DropdownMenuSeparator />
+                
                 <DropdownMenuItem asChild>
                   <Link href="/settings">
                     <Settings className="w-4 h-4 mr-2" />
@@ -228,6 +308,7 @@ export default function DashboardLayoutClient({
 
         {/* Page content */}
         <main className="flex-1 overflow-y-auto relative z-0">
+          <OverLimitBanner />
           {children}
         </main>
       </div>

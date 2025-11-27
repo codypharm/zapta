@@ -48,6 +48,8 @@ const AI_MODELS = [
   { value: "claude-3.5-haiku", label: "Claude 3.5 Haiku" },
   // OpenAI
   { value: "gpt-4o", label: "GPT-4o" },
+  { value: "gpt-4.5", label: "GPT-4.5" },
+  { value: "gpt-5", label: "GPT-5 ⭐ NEW" },
   { value: "gpt-3.5-turbo", label: "GPT-3.5 Turbo" },
 ];
 
@@ -79,7 +81,7 @@ export default function CreateAgentPage() {
     type: "",
     description: "",
     instructions: "",
-    model: "gemini-2.5-flash",
+    model: "gemini-2.0-flash",
     tone: "professional",
     leadCollection: {
       enabled: false,
@@ -98,6 +100,47 @@ export default function CreateAgentPage() {
   const [selectedIntegrations, setSelectedIntegrations] = useState<string[]>([]);
   const [availableIntegrations, setAvailableIntegrations] = useState<any[]>([]);
   const [loadingIntegrations, setLoadingIntegrations] = useState(false);
+  const [formRestored, setFormRestored] = useState(false);
+
+  // Restore form state from localStorage on mount
+  useEffect(() => {
+    const savedForm = localStorage.getItem('agent-creation-draft');
+    if (savedForm) {
+      try {
+        const parsed = JSON.parse(savedForm);
+        setFormData(parsed.formData || formData);
+        setSelectedIntegrations(parsed.selectedIntegrations || []);
+        
+        // Restore the step they were on
+        if (parsed.currentStep && typeof parsed.currentStep === 'number') {
+          setCurrentStep(parsed.currentStep);
+        }
+        
+        setFormRestored(true);
+        console.log('Restored agent creation draft from localStorage');
+      } catch (error) {
+        console.error('Failed to restore form state:', error);
+      }
+    }
+  }, []);
+
+  // Auto-save form state to localStorage (debounced)
+  useEffect(() => {
+    if (!formRestored) return; // Don't save initial empty state
+    
+    const timeoutId = setTimeout(() => {
+      const draftData = {
+        formData,
+        selectedIntegrations,
+        currentStep, // Save current step
+        timestamp: new Date().toISOString(),
+      };
+      localStorage.setItem('agent-creation-draft', JSON.stringify(draftData));
+      console.log('Auto-saved agent creation draft (step', currentStep + ')');
+    }, 1000); // Debounce for 1 second
+
+    return () => clearTimeout(timeoutId);
+  }, [formData, selectedIntegrations, currentStep, formRestored]);
 
   // Fetch user plan
   useEffect(() => {
@@ -107,23 +150,76 @@ export default function CreateAgentPage() {
         const supabase = createClient();
         
         const { data: { user } } = await supabase.auth.getUser();
-        if (!user) return;
+        if (!user) {
+          console.log('No user found');
+          return;
+        }
         
-        const { data: profile } = await supabase
+        const { data: profile, error: profileError } = await supabase
           .from('profiles')
           .select('tenant_id')
-          .eq('user_id', user.id)
+          .eq('id', user.id)
           .single();
         
+        if (profileError) {
+          console.error('Profile fetch error:', profileError);
+          return;
+        }
+        
         if (profile) {
-          const { data: tenant } = await supabase
-            .from('tenants')
-            .select('subscription_plan')
-            .eq('id', profile.tenant_id)
-            .single();
+          // Get plan from subscriptions table (source of truth)
+          // Use limit(1) with ordering to safely handle any duplicate records
+          const { data: subscriptions, error: subscriptionError } = await supabase
+            .from('subscriptions')
+            .select('plan_id, status')
+            .eq('tenant_id', profile.tenant_id)
+            .eq('status', 'active')  // Only get active subscriptions
+            .order('created_at', { ascending: false })  // Get most recent first
+            .limit(1);
           
-          if (tenant) {
-            setUserPlan(tenant.subscription_plan || 'free');
+          const subscription = subscriptions?.[0];
+          
+          if (subscriptionError) {
+            console.error('Subscription fetch error:', subscriptionError);
+            // Fallback to tenants table if subscriptions query fails
+            const { data: tenant, error: tenantError } = await supabase
+              .from('tenants')
+              .select('subscription_plan')
+              .eq('id', profile.tenant_id)
+              .single();
+            
+            if (tenantError) {
+              console.error('Tenant fetch error:', tenantError);
+              return;
+            }
+            
+            if (tenant) {
+              const plan = tenant.subscription_plan || 'free';
+              console.log('Loaded user plan from tenants (fallback):', plan);
+              setUserPlan(plan);
+            }
+            return;
+          }
+          
+          if (subscription) {
+            // Use plan_id from subscriptions table
+            const plan = subscription.plan_id || 'free';
+            console.log('Loaded user plan from subscriptions:', plan, '(status:', subscription.status + ')');
+            setUserPlan(plan);
+          } else {
+            // No active subscription found, fallback to tenants table
+            console.log('No active subscription found, checking tenants table');
+            const { data: tenant } = await supabase
+              .from('tenants')
+              .select('subscription_plan')
+              .eq('id', profile.tenant_id)
+              .single();
+            
+            if (tenant) {
+              const plan = tenant.subscription_plan || 'free';
+              console.log('Loaded user plan from tenants (no active subscription):', plan);
+              setUserPlan(plan);
+            }
           }
         }
       } catch (err) {
@@ -211,6 +307,9 @@ export default function CreateAgentPage() {
       if (result.error) {
         setError(result.error);
       } else {
+        // Clear draft from localStorage on successful creation
+        localStorage.removeItem('agent-creation-draft');
+        console.log('Cleared agent creation draft');
         router.push("/agents");
       }
     } catch (err) {
@@ -239,6 +338,32 @@ export default function CreateAgentPage() {
             Follow the steps to configure your AI agent
           </p>
         </div>
+
+        {/* Draft Restored Banner */}
+        {formRestored && (
+          <Alert className="border-blue-200 bg-blue-50">
+            <AlertDescription className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <span className="text-lg">💾</span>
+                <span className="text-sm text-blue-900">
+                  <strong>Draft restored!</strong> Your previous progress has been loaded. Continue where you left off.
+                </span>
+              </div>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  localStorage.removeItem('agent-creation-draft');
+                  setFormRestored(false);
+                  window.location.reload();
+                }}
+                className="h-8 text-blue-700 hover:text-blue-900"
+              >
+                Start Fresh
+              </Button>
+            </AlertDescription>
+          </Alert>
+        )}
 
         {/* Step Indicator */}
         <div className="flex items-center justify-between overflow-x-auto pb-2">
@@ -412,8 +537,19 @@ Example: You are a helpful customer support agent. Your goal is to assist custom
                       {(() => {
                         const { getPlanLimits } = require("@/lib/billing/plans");
                         const limits = getPlanLimits(userPlan);
-                        if (limits.models === '*') return 'All models';
-                        return (limits.models as string[]).join(", ");
+                        if (limits.models === '*') {
+                          // Business and Enterprise get all models including GPT-5
+                          if (['business', 'enterprise'].includes(userPlan)) {
+                            return 'All models including GPT-5';
+                          }
+                          return 'All models';
+                        }
+                        // Map model values to labels
+                        const modelLabels = (limits.models as string[]).map(modelValue => {
+                          const model = AI_MODELS.find(m => m.value === modelValue);
+                          return model ? model.label : modelValue;
+                        });
+                        return modelLabels.join(", ");
                       })()}
                       {" "}
                       <Link href="/settings/billing" className="text-primary hover:underline">

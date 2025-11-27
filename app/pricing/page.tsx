@@ -55,7 +55,7 @@ const plans = [
     features: [
       '10 AI agents',
       '5,000 messages/month',
-      'All AI models (Gemini 3, Claude, GPT-4)',
+      'All models inc. GPT-4.5',
       'Starter + HubSpot + Webhooks',
       '500 emails, 100 SMS/mo',
       '1 GB storage',
@@ -72,7 +72,7 @@ const plans = [
     features: [
       '50 AI agents',
       '25,000 messages/month',
-      'All models + priority access',
+      'All models + GPT-5 access',
       'Pro integrations + Advanced webhooks',
       '2,000 emails, 500 SMS/mo',
       '5 GB storage',
@@ -89,7 +89,7 @@ const plans = [
     features: [
       'Unlimited AI agents',
       '100,000 messages/month',
-      'Custom fine-tuning available',
+      'All models inc. GPT-5 + Custom fine-tuning',
       'All integrations + Custom development',
       'Unlimited emails & SMS',
       '50 GB storage',

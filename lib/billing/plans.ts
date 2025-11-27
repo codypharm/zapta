@@ -39,7 +39,19 @@ export const PLAN_LIMITS = {
   pro: {
     agents: 10,
     messages: 5000,
-    models: '*', // all models
+    models: [
+      'gemini-3-pro',
+      'gemini-2.0-flash',
+      'gemini-2.0-flash-thinking',
+      'gemini-1.5-flash',
+      'gemini-1.5-flash-8b',
+      'gemini-1.5-pro',
+      'claude-3.5-sonnet',
+      'claude-3.5-haiku',
+      'gpt-4o',
+      'gpt-4.5',
+      'gpt-3.5-turbo',
+    ],
     integrations: {
       email: 500,
       sms: 100,
@@ -114,6 +126,11 @@ export function getPlanPrice(planId: string) {
 
 export function canUseModel(planId: string, model: string): boolean {
   const limits = getPlanLimits(planId);
+  
+  // GPT-5 is only available on Business and Enterprise plans
+  if (model === 'gpt-5' && !['business', 'enterprise'].includes(planId)) {
+    return false;
+  }
   
   if (limits.models === '*') return true;
   
