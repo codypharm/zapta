@@ -22,7 +22,8 @@ export interface Integration {
     | "communication"
     | "storage"
     | "productivity"
-    | "development";
+    | "development"
+    | "document";
 
   /** Integration status */
   status: "connected" | "error" | "disconnected";
@@ -62,7 +63,8 @@ export interface IntegrationClass {
     | "communication"
     | "storage"
     | "productivity"
-    | "development";
+    | "development"
+    | "document";
 
   /** Authenticate with OAuth or API key */
   authenticate(credentials: any): Promise<void>;
@@ -283,9 +285,17 @@ export abstract class BaseIntegration implements IntegrationClass {
           "create_repository",
           "update_repository",
           "create_issue",
-          "update_issue",
+         "update_issue",
           "create_pull_request",
           "handle_webhooks",
+        ];
+      case "document":
+        return [
+          "list_files",
+          "read_document",
+          "search_files", "create_document",
+          "update_document",
+          "delete_document",
         ];
       default:
         return [];

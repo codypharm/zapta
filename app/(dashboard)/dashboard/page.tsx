@@ -150,52 +150,56 @@ async function DashboardContent({ params }: { params: { verified?: string } }) {
 
         {/* Quick stats */}
         <div className="grid gap-4 grid-cols-1 sm:grid-cols-3">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">
-                Active Agents
-              </CardTitle>
-              <Bot className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">
-                {stats?.activeAgents || 0}
+          <Card className="overflow-hidden hover:shadow-md transition-shadow">
+            <CardContent className="p-4 sm:p-5">
+              <div className="flex items-start gap-4">
+                <div className="flex h-10 w-10 sm:h-12 sm:w-12 shrink-0 items-center justify-center rounded-xl bg-purple-100 dark:bg-purple-900/30">
+                  <Bot className="h-5 w-5 sm:h-6 sm:w-6 text-purple-600 dark:text-purple-400" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs sm:text-sm font-medium text-muted-foreground">Active Agents</p>
+                  <p className="text-xl sm:text-2xl font-bold mt-1">{stats?.activeAgents || 0}</p>
+                </div>
               </div>
-              <p className="text-xs text-muted-foreground">
-                {stats?.activeAgents === 0
-                  ? "No agents created yet"
-                  : "Currently active"}
-              </p>
+              <div className="mt-3 pt-3 border-t">
+                <p className="text-xs text-muted-foreground">
+                  {stats?.activeAgents === 0 ? "No agents created yet" : "Currently active"}
+                </p>
+              </div>
             </CardContent>
           </Card>
 
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">
-                Recent Conversations
-              </CardTitle>
-              <MessageSquare className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">
-                {stats?.recentConversations || 0}
+          <Card className="overflow-hidden hover:shadow-md transition-shadow">
+            <CardContent className="p-4 sm:p-5">
+              <div className="flex items-start gap-4">
+                <div className="flex h-10 w-10 sm:h-12 sm:w-12 shrink-0 items-center justify-center rounded-xl bg-blue-100 dark:bg-blue-900/30">
+                  <MessageSquare className="h-5 w-5 sm:h-6 sm:w-6 text-blue-600 dark:text-blue-400" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs sm:text-sm font-medium text-muted-foreground">Recent Conversations</p>
+                  <p className="text-xl sm:text-2xl font-bold mt-1">{stats?.recentConversations || 0}</p>
+                </div>
               </div>
-              <p className="text-xs text-muted-foreground">Last 7 days</p>
+              <div className="mt-3 pt-3 border-t">
+                <p className="text-xs text-muted-foreground">Last 7 days</p>
+              </div>
             </CardContent>
           </Card>
 
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">
-                Recent Leads
-              </CardTitle>
-              <Users className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">
-                {stats?.recentLeads || 0}
+          <Card className="overflow-hidden hover:shadow-md transition-shadow">
+            <CardContent className="p-4 sm:p-5">
+              <div className="flex items-start gap-4">
+                <div className="flex h-10 w-10 sm:h-12 sm:w-12 shrink-0 items-center justify-center rounded-xl bg-green-100 dark:bg-green-900/30">
+                  <Users className="h-5 w-5 sm:h-6 sm:w-6 text-green-600 dark:text-green-400" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs sm:text-sm font-medium text-muted-foreground">Recent Leads</p>
+                  <p className="text-xl sm:text-2xl font-bold mt-1">{stats?.recentLeads || 0}</p>
+                </div>
               </div>
-              <p className="text-xs text-muted-foreground">Last 7 days</p>
+              <div className="mt-3 pt-3 border-t">
+                <p className="text-xs text-muted-foreground">Last 7 days</p>
+              </div>
             </CardContent>
           </Card>
         </div>

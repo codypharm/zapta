@@ -60,11 +60,11 @@ export function IntegrationsClient({
 
   // Get available providers that aren't already configured
   const getAvailableProviders = (type: string) => {
-    const configuredTypes = integrations.map((i) => i.type);
+    const configuredProviderIds = integrations.map((i) => i.provider);
     return availableProviders.filter(
       (provider) =>
         provider.type === type &&
-        !configuredTypes.includes(provider.type as any)
+        !configuredProviderIds.includes(provider.id)
     );
   };
 
@@ -124,8 +124,9 @@ export function IntegrationsClient({
             <TabsTrigger value="email" className="whitespace-nowrap">📧 Email</TabsTrigger>
             <TabsTrigger value="calendar" className="whitespace-nowrap">📅 Calendar</TabsTrigger>
             <TabsTrigger value="payment" className="whitespace-nowrap">💳 Payment</TabsTrigger>
-            <TabsTrigger value="sms" className="whitespace-nowrap">📱 SMS</TabsTrigger>
+            <TabsTrigger value="document" className="whitespace-nowrap">📝 Documents</TabsTrigger>
             <TabsTrigger value="crm" className="whitespace-nowrap">🎯 CRM</TabsTrigger>
+            <TabsTrigger value="sms" className="whitespace-nowrap">📱 SMS</TabsTrigger>
             <TabsTrigger value="slack" className="whitespace-nowrap">💬 Slack</TabsTrigger>
             <TabsTrigger value="webhook" className="whitespace-nowrap">🔗 Webhooks</TabsTrigger>
           </TabsList>
@@ -565,6 +566,64 @@ export function IntegrationsClient({
                     }}
                   >
                     Connect {provider.name}
+                  </Button>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </TabsContent>
+
+        <TabsContent value="document" className="space-y-6">
+          <div className="flex justify-between items-center">
+            <h3 className="text-lg font-semibold">Document Integrations</h3>
+            {getAvailableProviders("document").length > 0 && (
+              <Button
+                onClick={() => {
+                  setSelectedProvider(getAvailableProviders("document")[0]);
+                  setIsDialogOpen(true);
+                }}
+              >
+                Add New
+              </Button>
+            )}
+          </div>
+
+          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+            {integrationsByType["document"]?.map((integration) => (
+              <IntegrationCard
+                key={integration.id}
+                integration={integration}
+                onUpdate={handleIntegrationUpdated}
+                onDelete={handleIntegrationDeleted}
+                onConfigure={handleConfigure}
+              />
+            ))}
+
+            {getAvailableProviders("document").map((provider) => (
+              <Card key={`new-${provider.id}`} className="group cursor-pointer border-2 border-dashed transition-all hover:border-primary hover:shadow-lg">
+                <CardHeader>
+                  <div className="flex items-center space-x-3">
+                    <div className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-xl bg-slate-50 text-2xl transition-transform group-hover:scale-110">
+                      {provider.icon}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <CardTitle className="text-base font-semibold">{provider.name}</CardTitle>
+                      <p className="text-xs text-muted-foreground line-clamp-1">
+                        {provider.description}
+                      </p>
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <Button
+                    className="w-full"
+                    variant="outline"
+                    onClick={() => {
+                      setSelectedProvider(provider);
+                      setIsDialogOpen(true);
+                    }}
+                  >
+                    + Connect
                   </Button>
                 </CardContent>
               </Card>

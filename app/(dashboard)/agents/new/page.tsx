@@ -1,6 +1,7 @@
 /**
  * Create Agent Page
  * Multi-step wizard for creating new AI agents
+ * Supports both Customer Assistants (widget) and Business Assistants (tools)
  */
 
 "use client";
@@ -24,13 +25,15 @@ import {
 import { ArrowLeft, ArrowRight, Check, ExternalLink } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { LeadCollectionSettings, type LeadCollectionConfig } from "@/components/agents/lead-collection-settings";
+import { AgentClassSelector } from "@/components/agents/agent-class-selector";
+import { BusinessTemplateSelector } from "@/components/agents/business-template-selector";
+import { BUSINESS_TEMPLATES, type BusinessTemplate } from "@/lib/agents/business-assistant-templates";
 import Link from "next/link";
 
-const AGENT_TYPES = [
+// Customer Assistant subtypes (for widget)
+const CUSTOMER_AGENT_TYPES = [
   { value: "support", label: "Customer Support", description: "Handle customer inquiries and provide assistance" },
   { value: "sales", label: "Sales", description: "Qualify leads and assist with sales processes" },
-  { value: "automation", label: "Automation", description: "Automate workflows and repetitive tasks" },
-  { value: "analytics", label: "Analytics", description: "Analyze data and provide insights" },
 ];
 
 const AI_MODELS = [
@@ -60,6 +63,29 @@ const TONES = [
   { value: "formal", label: "Formal" },
 ];
 
+// Display names for integration providers
+const INTEGRATION_DISPLAY_NAMES: Record<string, string> = {
+  'google_calendar': 'Google Calendar',
+  'google-calendar': 'Google Calendar',
+  'google_drive': 'Google Drive',
+  'google-drive': 'Google Drive',
+  'hubspot': 'HubSpot',
+  'stripe': 'Stripe',
+  'slack': 'Slack',
+  'notion': 'Notion',
+  'email': 'Email',
+  'twilio': 'Twilio SMS',
+  'webhook': 'Webhooks',
+  'github': 'GitHub',
+  'discord': 'Discord',
+};
+
+const getIntegrationDisplayName = (provider: string): string => {
+  return INTEGRATION_DISPLAY_NAMES[provider] || provider.replace(/[_-]/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+};
+
+type AgentClass = 'customer_assistant' | 'business_assistant';
+
 export default function CreateAgentPage() {
   const router = useRouter();
   const [currentStep, setCurrentStep] = useState(1);
@@ -68,9 +94,16 @@ export default function CreateAgentPage() {
   const [userPlan, setUserPlan] = useState<string>('free');
   const [loadingPlan, setLoadingPlan] = useState(true);
 
+  // Agent class selection (Step 1)
+  const [agentClass, setAgentClass] = useState<AgentClass | null>(null);
+  
+  // Business Assistant template selection
+  const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(null);
+  const [selectedTemplate, setSelectedTemplate] = useState<BusinessTemplate | null>(null);
+
   const [formData, setFormData] = useState<{
     name: string;
-    type: string;
+    subtype: string; // For Customer Assistant: support, sales
     description: string;
     instructions: string;
     model: string;
@@ -78,7 +111,7 @@ export default function CreateAgentPage() {
     leadCollection: LeadCollectionConfig;
   }>({
     name: "",
-    type: "",
+    subtype: "",
     description: "",
     instructions: "",
     model: "gemini-2.0-flash",
@@ -102,6 +135,32 @@ export default function CreateAgentPage() {
   const [loadingIntegrations, setLoadingIntegrations] = useState(false);
   const [formRestored, setFormRestored] = useState(false);
 
+  // Determine total steps based on agent class
+  const getTotalSteps = () => {
+    if (!agentClass) return 5;
+    if (agentClass === 'business_assistant') {
+      return 5; // Class → Template → Configure → Integrations → Review
+    }
+    return 5; // Class → Basics → Configure → Integrations → Review
+  };
+
+  // Get step label based on current step and agent class
+  const getStepLabel = (step: number) => {
+    if (step === 1) return "Type";
+    if (agentClass === 'business_assistant') {
+      if (step === 2) return "Template";
+      if (step === 3) return "Configure";
+      if (step === 4) return "Integrations";
+      if (step === 5) return "Review";
+    } else {
+      if (step === 2) return "Basics";
+      if (step === 3) return "Configure";
+      if (step === 4) return "Integrations";
+      if (step === 5) return "Review";
+    }
+    return "";
+  };
+
   // Restore form state from localStorage on mount
   useEffect(() => {
     const savedForm = localStorage.getItem('agent-creation-draft');
@@ -110,6 +169,11 @@ export default function CreateAgentPage() {
         const parsed = JSON.parse(savedForm);
         setFormData(parsed.formData || formData);
         setSelectedIntegrations(parsed.selectedIntegrations || []);
+        setAgentClass(parsed.agentClass || null);
+        setSelectedTemplateId(parsed.selectedTemplateId || null);
+        if (parsed.selectedTemplateId && BUSINESS_TEMPLATES[parsed.selectedTemplateId]) {
+          setSelectedTemplate(BUSINESS_TEMPLATES[parsed.selectedTemplateId]);
+        }
         
         // Restore the step they were on
         if (parsed.currentStep && typeof parsed.currentStep === 'number') {
@@ -126,13 +190,15 @@ export default function CreateAgentPage() {
 
   // Auto-save form state to localStorage (debounced)
   useEffect(() => {
-    if (!formRestored) return; // Don't save initial empty state
+    if (!formRestored && currentStep === 1 && !agentClass) return; // Don't save initial empty state
     
     const timeoutId = setTimeout(() => {
       const draftData = {
         formData,
         selectedIntegrations,
-        currentStep, // Save current step
+        agentClass,
+        selectedTemplateId,
+        currentStep,
         timestamp: new Date().toISOString(),
       };
       localStorage.setItem('agent-creation-draft', JSON.stringify(draftData));
@@ -140,7 +206,7 @@ export default function CreateAgentPage() {
     }, 1000); // Debounce for 1 second
 
     return () => clearTimeout(timeoutId);
-  }, [formData, selectedIntegrations, currentStep, formRestored]);
+  }, [formData, selectedIntegrations, currentStep, formRestored, agentClass, selectedTemplateId]);
 
   // Fetch user plan
   useEffect(() => {
@@ -167,48 +233,18 @@ export default function CreateAgentPage() {
         }
         
         if (profile) {
-          // Get plan from subscriptions table (source of truth)
-          // Use limit(1) with ordering to safely handle any duplicate records
           const { data: subscriptions, error: subscriptionError } = await supabase
             .from('subscriptions')
             .select('plan_id, status')
             .eq('tenant_id', profile.tenant_id)
-            .eq('status', 'active')  // Only get active subscriptions
-            .order('created_at', { ascending: false })  // Get most recent first
+            .eq('status', 'active')
+            .order('created_at', { ascending: false })
             .limit(1);
           
           const subscription = subscriptions?.[0];
           
           if (subscriptionError) {
             console.error('Subscription fetch error:', subscriptionError);
-            // Fallback to tenants table if subscriptions query fails
-            const { data: tenant, error: tenantError } = await supabase
-              .from('tenants')
-              .select('subscription_plan')
-              .eq('id', profile.tenant_id)
-              .single();
-            
-            if (tenantError) {
-              console.error('Tenant fetch error:', tenantError);
-              return;
-            }
-            
-            if (tenant) {
-              const plan = tenant.subscription_plan || 'free';
-              console.log('Loaded user plan from tenants (fallback):', plan);
-              setUserPlan(plan);
-            }
-            return;
-          }
-          
-          if (subscription) {
-            // Use plan_id from subscriptions table
-            const plan = subscription.plan_id || 'free';
-            console.log('Loaded user plan from subscriptions:', plan, '(status:', subscription.status + ')');
-            setUserPlan(plan);
-          } else {
-            // No active subscription found, fallback to tenants table
-            console.log('No active subscription found, checking tenants table');
             const { data: tenant } = await supabase
               .from('tenants')
               .select('subscription_plan')
@@ -216,9 +252,22 @@ export default function CreateAgentPage() {
               .single();
             
             if (tenant) {
-              const plan = tenant.subscription_plan || 'free';
-              console.log('Loaded user plan from tenants (no active subscription):', plan);
-              setUserPlan(plan);
+              setUserPlan(tenant.subscription_plan || 'free');
+            }
+            return;
+          }
+          
+          if (subscription) {
+            setUserPlan(subscription.plan_id || 'free');
+          } else {
+            const { data: tenant } = await supabase
+              .from('tenants')
+              .select('subscription_plan')
+              .eq('id', profile.tenant_id)
+              .single();
+            
+            if (tenant) {
+              setUserPlan(tenant.subscription_plan || 'free');
             }
           }
         }
@@ -255,23 +304,58 @@ export default function CreateAgentPage() {
     setError(null);
   };
 
+  // Handle template selection - auto-populate form
+  const handleTemplateSelect = (templateId: string, template: BusinessTemplate) => {
+    setSelectedTemplateId(templateId);
+    setSelectedTemplate(template);
+    
+    // Auto-populate form from template
+    setFormData(prev => ({
+      ...prev,
+      name: `${template.name} Assistant`,
+      description: template.description,
+      instructions: template.systemPrompt,
+      tone: template.tone || 'professional',
+    }));
+    
+    // Pre-select recommended integrations that are available
+    const recommendedIds = availableIntegrations
+      .filter(i => template.recommendedIntegrations.includes(i.provider))
+      .map(i => i.id);
+    setSelectedIntegrations(recommendedIds);
+  };
+
   const validateStep = (step: number): boolean => {
     switch (step) {
       case 1:
-        if (!formData.name.trim()) {
-          setError("Agent name is required");
-          return false;
-        }
-        if (!formData.type) {
+        if (!agentClass) {
           setError("Please select an agent type");
-          return false;
-        }
-        if (!formData.description.trim()) {
-          setError("Description is required");
           return false;
         }
         return true;
       case 2:
+        if (agentClass === 'business_assistant') {
+          if (!selectedTemplateId) {
+            setError("Please select a template");
+            return false;
+          }
+        } else {
+          // Customer Assistant basics
+          if (!formData.name.trim()) {
+            setError("Agent name is required");
+            return false;
+          }
+          if (!formData.subtype) {
+            setError("Please select an agent purpose");
+            return false;
+          }
+          if (!formData.description.trim()) {
+            setError("Description is required");
+            return false;
+          }
+        }
+        return true;
+      case 3:
         if (!formData.instructions.trim()) {
           setError("Instructions are required");
           return false;
@@ -284,7 +368,7 @@ export default function CreateAgentPage() {
 
   const handleNext = () => {
     if (validateStep(currentStep)) {
-      setCurrentStep((prev) => Math.min(prev + 1, 4)); // Now 4 steps
+      setCurrentStep((prev) => Math.min(prev + 1, getTotalSteps()));
     }
   };
 
@@ -299,10 +383,21 @@ export default function CreateAgentPage() {
 
     try {
       const { createAgent } = await import("@/lib/agents/actions");
-      const result = await createAgent({
-        ...formData,
-        integration_ids: selectedIntegrations, // Include selected integrations
-      });
+      
+      // Build the data for the API
+      const agentData = {
+        name: formData.name,
+        type: agentClass!, // 'customer_assistant' or 'business_assistant'
+        description: formData.description,
+        instructions: formData.instructions,
+        model: formData.model,
+        tone: formData.tone,
+        template: agentClass === 'business_assistant' && selectedTemplateId ? selectedTemplateId : undefined,
+        integration_ids: selectedIntegrations,
+        leadCollection: agentClass === 'customer_assistant' ? formData.leadCollection : undefined,
+      };
+      
+      const result = await createAgent(agentData);
 
       if (result.error) {
         setError(result.error);
@@ -321,7 +416,7 @@ export default function CreateAgentPage() {
 
   return (
     <div className="p-4 sm:p-6 md:p-8">
-      <div className="mx-auto max-w-3xl space-y-6 sm:space-y-8">
+      <div className={`mx-auto space-y-6 sm:space-y-8 ${currentStep <= 2 ? 'max-w-6xl' : 'max-w-4xl'}`}>
         {/* Header */}
         <div>
           <Button
@@ -335,7 +430,11 @@ export default function CreateAgentPage() {
           </Button>
           <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Create New Agent</h1>
           <p className="text-sm sm:text-base text-muted-foreground mt-2">
-            Follow the steps to configure your AI agent
+            {agentClass === 'business_assistant' 
+              ? "Create an AI assistant for your business operations" 
+              : agentClass === 'customer_assistant'
+              ? "Create a customer-facing chatbot for your website"
+              : "Choose what type of agent you want to create"}
           </p>
         </div>
 
@@ -346,7 +445,7 @@ export default function CreateAgentPage() {
               <div className="flex items-center gap-2">
                 <span className="text-lg">💾</span>
                 <span className="text-sm text-blue-900">
-                  <strong>Draft restored!</strong> Your previous progress has been loaded. Continue where you left off.
+                  <strong>Draft restored!</strong> Your previous progress has been loaded.
                 </span>
               </div>
               <Button
@@ -357,7 +456,7 @@ export default function CreateAgentPage() {
                   setFormRestored(false);
                   window.location.reload();
                 }}
-                className="h-8 text-blue-700 hover:text-blue-900"
+                className="h-8 text-blue-700 hover:text-white hover:bg-primary"
               >
                 Start Fresh
               </Button>
@@ -367,7 +466,7 @@ export default function CreateAgentPage() {
 
         {/* Step Indicator */}
         <div className="flex items-center justify-between overflow-x-auto pb-2">
-          {[1, 2, 3, 4].map((step) => (
+          {[1, 2, 3, 4, 5].map((step) => (
             <div key={step} className="flex items-center flex-1 min-w-0">
               <div className="flex items-center min-w-0">
                 <div
@@ -389,10 +488,10 @@ export default function CreateAgentPage() {
                     step <= currentStep ? "text-foreground" : "text-muted-foreground"
                   }`}
                 >
-                  {step === 1 ? "Basics" : step === 2 ? "Configure" : step === 3 ? "Integrations" : "Review"}
+                  {getStepLabel(step)}
                 </span>
               </div>
-              {step < 4 && (
+              {step < 5 && (
                 <div
                   className={`flex-1 h-1 mx-2 sm:mx-4 ${
                     step < currentStep ? "bg-primary" : "bg-gray-200"
@@ -410,13 +509,36 @@ export default function CreateAgentPage() {
           </Alert>
         )}
 
-        {/* Step 1: Basics */}
+        {/* Step 1: Choose Agent Class */}
         {currentStep === 1 && (
+          <AgentClassSelector
+            value={agentClass}
+            onChange={(value) => {
+              setAgentClass(value);
+              setError(null);
+              // Reset form when changing class
+              if (value === 'customer_assistant') {
+                setSelectedTemplateId(null);
+                setSelectedTemplate(null);
+              }
+            }}
+          />
+        )}
+
+        {/* Step 2: Template (Business) or Basics (Customer) */}
+        {currentStep === 2 && agentClass === 'business_assistant' && (
+          <BusinessTemplateSelector
+            value={selectedTemplateId}
+            onChange={handleTemplateSelect}
+          />
+        )}
+
+        {currentStep === 2 && agentClass === 'customer_assistant' && (
           <Card>
             <CardHeader>
               <CardTitle>Basic Information</CardTitle>
               <CardDescription>
-                Give your agent a name and choose its purpose
+                Give your customer assistant a name and choose its purpose
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
@@ -431,16 +553,16 @@ export default function CreateAgentPage() {
               </div>
 
               <div className="space-y-2">
-                <Label>Agent Type</Label>
+                <Label>Agent Purpose</Label>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
-                  {AGENT_TYPES.map((type) => (
+                  {CUSTOMER_AGENT_TYPES.map((type) => (
                     <button
                       key={type.value}
-                      onClick={() => updateFormData("type", type.value)}
+                      onClick={() => updateFormData("subtype", type.value)}
                       className={`
                         p-3 sm:p-4 rounded-lg border-2 text-left transition-all
                         ${
-                          formData.type === type.value
+                          formData.subtype === type.value
                             ? "border-primary bg-primary/5"
                             : "border-gray-200 hover:border-gray-300"
                         }
@@ -469,29 +591,47 @@ export default function CreateAgentPage() {
           </Card>
         )}
 
-        {/* Step 2: Configure */}
-        {currentStep === 2 && (
+        {/* Step 3: Configure */}
+        {currentStep === 3 && (
           <Card>
             <CardHeader>
               <CardTitle>Configure Agent</CardTitle>
               <CardDescription>
-                Define how your agent should behave
+                {agentClass === 'business_assistant'
+                  ? "Customize your Business Assistant's behavior (pre-filled from template)"
+                  : "Define how your agent should behave"}
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
+              {/* Name field for Business Assistant (editable) */}
+              {agentClass === 'business_assistant' && (
+                <div className="space-y-2">
+                  <Label htmlFor="name">Agent Name</Label>
+                  <Input
+                    id="name"
+                    placeholder="e.g., My Finance Assistant"
+                    value={formData.name}
+                    onChange={(e) => updateFormData("name", e.target.value)}
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Pre-filled from template. You can customize it.
+                  </p>
+                </div>
+              )}
+
               <div className="space-y-2">
                 <Label htmlFor="instructions">Instructions</Label>
                 <Textarea
                   id="instructions"
-                  placeholder="Describe what this agent should do in plain English...
-
-Example: You are a helpful customer support agent. Your goal is to assist customers with their questions about our product. Be friendly, professional, and concise in your responses. If you don't know an answer, admit it and offer to escalate to a human agent."
+                  placeholder="Describe what this agent should do in plain English..."
                   rows={10}
                   value={formData.instructions}
                   onChange={(e) => updateFormData("instructions", e.target.value)}
                 />
                 <p className="text-xs text-muted-foreground">
-                  Be specific about the agent's role, tone, and behavior
+                  {agentClass === 'business_assistant' 
+                    ? "Pre-filled from template. Add any custom instructions specific to your business."
+                    : "Be specific about the agent's role, tone, and behavior"}
                 </p>
               </div>
 
@@ -531,32 +671,6 @@ Example: You are a helpful customer support agent. Your goal is to assist custom
                       })}
                     </SelectContent>
                   </Select>
-                  {!loadingPlan && (
-                    <p className="text-xs text-muted-foreground">
-                      Your <span className="capitalize">{userPlan}</span> plan allows:{" "}
-                      {(() => {
-                        const { getPlanLimits } = require("@/lib/billing/plans");
-                        const limits = getPlanLimits(userPlan);
-                        if (limits.models === '*') {
-                          // Business and Enterprise get all models including GPT-5
-                          if (['business', 'enterprise'].includes(userPlan)) {
-                            return 'All models including GPT-5';
-                          }
-                          return 'All models';
-                        }
-                        // Map model values to labels
-                        const modelLabels = (limits.models as string[]).map(modelValue => {
-                          const model = AI_MODELS.find(m => m.value === modelValue);
-                          return model ? model.label : modelValue;
-                        });
-                        return modelLabels.join(", ");
-                      })()}
-                      {" "}
-                      <Link href="/settings/billing" className="text-primary hover:underline">
-                        Upgrade plan
-                      </Link>
-                    </p>
-                  )}
                 </div>
 
                 <div className="space-y-2">
@@ -579,22 +693,26 @@ Example: You are a helpful customer support agent. Your goal is to assist custom
                 </div>
               </div>
 
-              {/* Lead Collection Settings */}
-              <LeadCollectionSettings
-                config={formData.leadCollection}
-                onChange={(config) => setFormData((prev) => ({ ...prev, leadCollection: config }))}
-              />
+              {/* Lead Collection - Only for Customer Assistants */}
+              {agentClass === 'customer_assistant' && (
+                <LeadCollectionSettings
+                  config={formData.leadCollection}
+                  onChange={(config) => setFormData((prev) => ({ ...prev, leadCollection: config }))}
+                />
+              )}
             </CardContent>
           </Card>
         )}
 
-        {/* Step 3: Select Integrations */}
-        {currentStep === 3 && (
+        {/* Step 4: Select Integrations */}
+        {currentStep === 4 && (
           <Card>
             <CardHeader>
               <CardTitle>Select Integrations</CardTitle>
               <CardDescription>
-                Choose which integrations this agent can access
+                {agentClass === 'business_assistant' && selectedTemplate
+                  ? `Choose integrations for your ${selectedTemplate.name} Assistant. Recommended: ${selectedTemplate.recommendedIntegrations.join(', ')}`
+                  : "Choose which integrations this agent can access"}
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -619,40 +737,51 @@ Example: You are a helpful customer support agent. Your goal is to assist custom
               ) : (
                 <div className="space-y-4">
                   <p className="text-sm text-muted-foreground">
-                    Select which integrations this agent can use. Leave all unchecked if the agent doesn't need any integrations.
+                    {agentClass === 'business_assistant'
+                      ? "These integrations give your assistant access to query data and perform actions."
+                      : "Select which integrations this agent can use."}
                   </p>
                   <div className="space-y-3">
-                    {availableIntegrations.map((integration) => (
-                      <div key={integration.id} className="flex items-start space-x-3 p-3 rounded-lg border hover:bg-muted/50 transition-colors">
-                        <Checkbox
-                          id={integration.id}
-                          checked={selectedIntegrations.includes(integration.id)}
-                          onCheckedChange={(checked) => {
-                            if (checked) {
-                              setSelectedIntegrations([...selectedIntegrations, integration.id]);
-                            } else {
-                              setSelectedIntegrations(
-                                selectedIntegrations.filter(id => id !== integration.id)
-                              );
-                            }
-                          }}
-                          className="mt-1"
-                        />
-                        <label htmlFor={integration.id} className="flex-1 cursor-pointer">
-                          <div className="flex items-center gap-2 mb-1">
-                            <span className="font-medium capitalize">{integration.provider}</span>
-                            <Badge variant={integration.status === 'connected' ? 'default' : 'secondary'}>
-                              {integration.status}
-                            </Badge>
-                          </div>
-                          {integration.config?.webhook_url && (
-                            <p className="text-xs text-muted-foreground">
-                              {integration.config.webhook_url}
-                            </p>
-                          )}
-                        </label>
-                      </div>
-                    ))}
+                    {availableIntegrations.map((integration) => {
+                      const isRecommended = selectedTemplate?.recommendedIntegrations.includes(integration.provider);
+                      
+                      return (
+                        <div 
+                          key={integration.id} 
+                          className={`flex items-start space-x-3 p-3 rounded-lg border transition-colors ${
+                            isRecommended ? 'border-primary/50 bg-primary/5' : 'hover:bg-muted/50'
+                          }`}
+                        >
+                          <Checkbox
+                            id={integration.id}
+                            checked={selectedIntegrations.includes(integration.id)}
+                            onCheckedChange={(checked) => {
+                              if (checked) {
+                                setSelectedIntegrations([...selectedIntegrations, integration.id]);
+                              } else {
+                                setSelectedIntegrations(
+                                  selectedIntegrations.filter(id => id !== integration.id)
+                                );
+                              }
+                            }}
+                            className="mt-1"
+                          />
+                          <label htmlFor={integration.id} className="flex-1 cursor-pointer">
+                            <div className="flex items-center gap-2 mb-1">
+                              <span className="font-medium">{getIntegrationDisplayName(integration.provider)}</span>
+                              <Badge variant={integration.status === 'connected' ? 'default' : 'secondary'}>
+                                {integration.status}
+                              </Badge>
+                              {isRecommended && (
+                                <Badge variant="outline" className="text-xs border-primary text-primary">
+                                  Recommended
+                                </Badge>
+                              )}
+                            </div>
+                          </label>
+                        </div>
+                      );
+                    })}
                   </div>
                   <p className="text-xs text-muted-foreground">
                     💡 Tip: You can always edit integration access later from the agent's settings.
@@ -663,25 +792,28 @@ Example: You are a helpful customer support agent. Your goal is to assist custom
           </Card>
         )}
 
-        {/* Step 4: Review */}
-        {currentStep === 4 && (
+        {/* Step 5: Review */}
+        {currentStep === 5 && (
           <Card>
             <CardHeader>
-              <CardTitle>Review & Deploy</CardTitle>
+              <CardTitle>Review & Create</CardTitle>
               <CardDescription>
-                Review your agent configuration before creating
+                Review your {agentClass === 'business_assistant' ? 'Business' : 'Customer'} Assistant configuration
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
               <div className="space-y-4">
-                <div>
-                  <div className="text-sm font-medium text-muted-foreground">Name</div>
-                  <div className="text-lg font-semibold">{formData.name}</div>
-                </div>
-
-                <div>
-                  <div className="text-sm font-medium text-muted-foreground">Type</div>
-                  <div className="capitalize">{formData.type}</div>
+                <div className="flex items-center gap-3 p-4 bg-muted rounded-lg">
+                  <span className="text-3xl">
+                    {agentClass === 'business_assistant' ? '💼' : '💬'}
+                  </span>
+                  <div>
+                    <div className="font-semibold text-lg">{formData.name}</div>
+                    <div className="text-sm text-muted-foreground">
+                      {agentClass === 'business_assistant' ? 'Business Assistant' : 'Customer Assistant'}
+                      {selectedTemplate && ` • ${selectedTemplate.name} Template`}
+                    </div>
+                  </div>
                 </div>
 
                 <div>
@@ -690,64 +822,71 @@ Example: You are a helpful customer support agent. Your goal is to assist custom
                 </div>
 
                 <div>
-                  <div className="text-sm font-medium text-muted-foreground">Model</div>
-                  <div>
-                    {AI_MODELS.find((m) => m.value === formData.model)?.label}
+                  <div className="text-sm font-medium text-muted-foreground">Model & Tone</div>
+                  <div className="flex gap-2 mt-1">
+                    <Badge variant="secondary">
+                      {AI_MODELS.find((m) => m.value === formData.model)?.label}
+                    </Badge>
+                    <Badge variant="outline" className="capitalize">
+                      {formData.tone}
+                    </Badge>
                   </div>
                 </div>
 
                 <div>
-                  <div className="text-sm font-medium text-muted-foreground">Tone</div>
-                  <div className="capitalize">{formData.tone}</div>
+                  <div className="text-sm font-medium text-muted-foreground">Integrations</div>
+                  {selectedIntegrations.length > 0 ? (
+                    <div className="flex flex-wrap gap-2 mt-1">
+                      {selectedIntegrations.map(id => {
+                        const integration = availableIntegrations.find(i => i.id === id);
+                        return integration ? (
+                          <Badge key={id} variant="secondary" className="capitalize">
+                            {integration.provider}
+                          </Badge>
+                        ) : null;
+                      })}
+                    </div>
+                  ) : (
+                    <div className="text-sm text-muted-foreground mt-1">No integrations selected</div>
+                  )}
                 </div>
 
                 <div>
                   <div className="text-sm font-medium text-muted-foreground">Instructions</div>
-                  <div className="whitespace-pre-wrap bg-muted p-4 rounded-lg text-sm">
+                  <div className="whitespace-pre-wrap bg-muted p-4 rounded-lg text-sm mt-1 max-h-48 overflow-y-auto">
                     {formData.instructions}
                   </div>
                 </div>
 
-                <div>
-                  <div className="text-sm font-medium text-muted-foreground mb-2">Lead Collection</div>
-                  {formData.leadCollection.enabled ? (
-                    <div className="bg-muted p-4 rounded-lg space-y-3">
+                {agentClass === 'customer_assistant' && formData.leadCollection.enabled && (
+                  <div>
+                    <div className="text-sm font-medium text-muted-foreground mb-2">Lead Collection</div>
+                    <div className="bg-muted p-4 rounded-lg space-y-2">
                       <div className="flex items-center gap-2">
                         <div className="w-2 h-2 rounded-full bg-green-500"></div>
                         <span className="text-sm font-medium">Enabled</span>
                       </div>
-                      <div>
-                        <div className="text-xs text-muted-foreground mb-1">Collecting Fields:</div>
-                        <div className="flex flex-wrap gap-2">
-                          {Object.entries(formData.leadCollection.fields).map(([field, config]) =>
-                            config.enabled && (
-                              <span key={field} className="text-xs px-2 py-1 bg-primary/10 text-primary rounded capitalize">
-                                {field} {config.required && <span className="text-red-500">*</span>}
-                              </span>
-                            )
-                          )}
-                        </div>
+                      <div className="flex flex-wrap gap-2">
+                        {Object.entries(formData.leadCollection.fields).map(([field, config]) =>
+                          config.enabled && (
+                            <span key={field} className="text-xs px-2 py-1 bg-primary/10 text-primary rounded capitalize">
+                              {field} {config.required && <span className="text-red-500">*</span>}
+                            </span>
+                          )
+                        )}
                       </div>
-                      {formData.leadCollection.welcomeMessage && (
-                        <div>
-                          <div className="text-xs text-muted-foreground">Welcome Message:</div>
-                          <div className="text-sm">{formData.leadCollection.welcomeMessage}</div>
-                        </div>
-                      )}
-                      {formData.leadCollection.submitButtonText && (
-                        <div>
-                          <div className="text-xs text-muted-foreground">Button Text:</div>
-                          <div className="text-sm">{formData.leadCollection.submitButtonText}</div>
-                        </div>
-                      )}
                     </div>
-                  ) : (
-                    <div className="bg-muted p-4 rounded-lg flex items-center gap-2">
-                      <div className="w-2 h-2 rounded-full bg-gray-400"></div>
-                      <span className="text-sm text-muted-foreground">Disabled</span>
-                    </div>
-                  )}
-                </div>
+                  </div>
+                )}
+
+                {agentClass === 'business_assistant' && (
+                  <Alert className="border-green-200 bg-green-50">
+                    <AlertDescription className="text-sm text-green-900">
+                      <strong>🔧 Tools Enabled:</strong> This Business Assistant will have access to 27 tools 
+                      for querying data, checking calendar, sending emails, and more based on connected integrations.
+                    </AlertDescription>
+                  </Alert>
+                )}
               </div>
             </CardContent>
           </Card>
@@ -765,7 +904,7 @@ Example: You are a helpful customer support agent. Your goal is to assist custom
             Back
           </Button>
 
-          {currentStep < 4 ? (
+          {currentStep < getTotalSteps() ? (
             <Button onClick={handleNext} className="w-full sm:w-auto">
               Next
               <ArrowRight className="w-4 h-4 ml-2" />

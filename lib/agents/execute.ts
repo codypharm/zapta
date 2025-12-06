@@ -183,7 +183,11 @@ export async function executeAgent(
     // 2. Build context (conversation history, knowledge base)
     const context = await buildContext(agent, input);
 
-    // 3. Build system prompt
+    // 3. Load integration instances for this agent
+    // This is needed for both tool execution and legacy actions
+    const integrationMap = await getIntegrationMap(agent.tenant_id, agent.id);
+
+    // 4. Build system prompt
     const systemPrompt = buildSystemPrompt(
       agent.name,
       agent.config.instructions,
@@ -207,16 +211,68 @@ export async function executeAgent(
     // 5. Select and call AI model
     const model = selectAIModel(agent.config.model);
 
-    const { text } = await generateText({
+    // 6. Load tools for Business Assistants only (not Customer Assistants/widget)
+    let availableTools = {};
+    let toolCallResults: any[] = [];
+    
+    if (agent.type === 'business_assistant') {
+      const { createTools } = await import('./tools');
+      
+      // Create tools with context injected via closure
+      const allTools = createTools({
+        integrationMap,
+        tenantId: agent.tenant_id,
+        agentId: agent.id,
+      });
+      
+      availableTools = allTools;
+      
+      console.log(`🔧 Loaded ${Object.keys(availableTools).length} tools for Business Assistant`);
+    }
+
+
+    // 7. Execute with tools (if Business Assistant) or without (if Customer Assistant)
+    const generateOptions: any = {
       model,
       messages: conversationMessages,
       temperature: 0.7,
-    });
+    };
 
-    // 6. Process agent actions based on response
-    const actions = await processAgentActions(agent, input, text);
+    // Add tools and enable multi-step execution for Business Assistants
+    if (Object.keys(availableTools).length > 0) {
+      generateOptions.tools = availableTools;
+      generateOptions.maxSteps = 5; // Allow up to 5 tool calls in sequence
+    }
 
-    // 7. Log execution
+    const result = await generateText(generateOptions);
+    
+    const text = result.text;
+    
+    // Extract tool calls if any were made
+    if (result.steps) {
+      for (const step of result.steps) {
+        if (step.toolCalls && step.toolCalls.length > 0) {
+          toolCallResults.push(...step.toolCalls.map((tc: any, index: number) => ({
+            toolName: tc.toolName,
+            args: tc.args,
+            result: step.toolResults?.[index],
+          })));
+        }
+      }
+    }
+
+    // 8. Log tool usage if any tools were called
+    if (toolCallResults.length > 0) {
+      await logToolUsage(agent.tenant_id, agent.id, toolCallResults);
+      console.log(`✅ Executed ${toolCallResults.length} tool calls`);
+    }
+
+    // 9. Process legacy agent actions (for Customer Assistants or as fallback)
+    const actions = agent.type === 'customer_assistant' 
+      ? await processAgentActions(agent, input, text)
+      : []; // Business Assistants use tools instead
+
+    // 10. Log execution
     await logExecution(agent.id, agent.tenant_id, input, {
       message: text,
       actions,
@@ -597,6 +653,43 @@ async function logExecution(
     });
   } catch (logError) {
     console.error("Failed to log execution:", logError);
+  }
+}
+
+/**
+ * Log tool usage for analytics
+ */
+async function logToolUsage(
+  tenantId: string,
+  agentId: string,
+  toolCalls: any[]
+): Promise<void> {
+  const supabase = await createServerClient();
+
+  try {
+    // Log each tool call individually
+    const records = toolCalls.map(call => ({
+      agent_id: agentId,
+      tenant_id: tenantId,
+      status: call.result?.error ? 'error' : 'success',
+      input: {
+        tool: call.toolName,
+        args: call.args,
+      },
+      output: {
+        result: call.result,
+      },
+      error: call.result?.error || null,
+      duration_ms: null, // Could track this if needed
+    }));
+
+    // Store in agent_executions with tool_call metadata
+    await supabase.from('agent_executions').insert(records);
+
+    console.log(`📊 Logged ${toolCalls.length} tool calls for agent ${agentId}`);
+  } catch (error) {
+    console.error('Failed to log tool usage:', error);
+    // Don't throw - logging failure shouldn't break execution
   }
 }
 

@@ -60,6 +60,9 @@ export function IntegrationCard({
       webhook: "🔗",
       twilio: "📱",
       google_calendar: "📅",
+      google_drive: "📁",
+      notion: "📝",
+      stripe: "💳",
     };
     return icons[provider] || "🔌";
   };
@@ -72,6 +75,9 @@ export function IntegrationCard({
       webhook: "Webhook",
       twilio: "Twilio SMS",
       google_calendar: "Google Calendar",
+      google_drive: "Google Drive",
+      notion: "Notion",
+      stripe: "Stripe",
     };
     return names[provider] || provider;
   };
@@ -197,8 +203,7 @@ export function IntegrationCard({
           {/* Actions */}
           <div className="flex justify-end space-x-2">
             {onConfigure && 
-             integration.provider !== 'hubspot' && 
-             integration.provider !== 'google_calendar' && (
+             !['hubspot', 'google_calendar', 'google_drive', 'notion'].includes(integration.provider) && (
               <Button
                 variant="outline"
                 size="sm"

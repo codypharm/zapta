@@ -10,12 +10,13 @@ import { createServerClient } from "@/lib/supabase/server";
 
 interface CreateAgentData {
   name: string;
-  type: string;
+  type: string; // 'customer_assistant' | 'business_assistant'
   description: string;
   instructions: string;
   model: string;
   tone: string;
-  integration_ids?: string[]; // NEW - selected integration IDs
+  template?: string; // Business Assistant template (executive, sales, finance, etc.)
+  integration_ids?: string[]; // Selected integration IDs
   leadCollection?: {
     enabled: boolean;
     fields: {
@@ -103,6 +104,7 @@ export async function createAgent(data: CreateAgentData) {
         name: data.name,
         type: data.type,
         description: data.description,
+        template: data.template || null, // Business Assistant template
         config,
         status: "active",
         created_by: user.id,

@@ -454,6 +454,68 @@ export class HubSpotIntegration extends BaseIntegration {
     };
   }
 
+  // ============================================================================
+  // BUSINESS ASSISTANT QUERY METHODS
+  // ============================================================================
+
+  /**
+   * Get recent contacts
+   * Used by Sales Assistant to track new leads
+   */
+  async getRecentContacts(limit: number = 10): Promise<HubSpotContact[]> {
+    const result = await this.makeHubSpotRequest<any>(
+      `/crm/v3/objects/contacts?limit=${limit}&sort=-createdate&properties=firstname,lastname,email,phone,company,createdate`
+    );
+
+    return result.results || [];
+  }
+
+  /**
+   * Get pipeline value
+   * Used by Sales Assistant to analyze sales performance
+   */
+  async getPipelineValue(): Promise<{ totalValue: number; dealCount: number; byStage: Record<string, number> }> {
+    // Fetch all open deals
+    const result = await this.makeHubSpotRequest<any>(
+      '/crm/v3/objects/deals?limit=100&properties=amount,dealstage,dealname'
+    );
+
+    const deals = result.results || [];
+    
+    let totalValue = 0;
+    const byStage: Record<string, number> = {};
+
+    deals.forEach((deal: any) => {
+      const amount = parseFloat(deal.properties.amount || '0');
+      const stage = deal.properties.dealstage || 'unknown';
+      
+      totalValue += amount;
+      byStage[stage] = (byStage[stage] || 0) + amount;
+    });
+
+    return {
+      totalValue,
+      dealCount: deals.length,
+      byStage
+    };
+  }
+
+  /**
+   * Get deal stages
+   * Used by Sales Assistant to understand pipeline structure
+   */
+  async getDealStages(pipelineId: string = 'default'): Promise<any[]> {
+    try {
+      const result = await this.makeHubSpotRequest<any>(
+        `/crm/v3/pipelines/deals/${pipelineId}/stages`
+      );
+      return result.results || [];
+    } catch (error) {
+      console.error('Failed to fetch deal stages:', error);
+      return [];
+    }
+  }
+
   /**
    * Get HubSpot integration capabilities
    */
@@ -468,6 +530,10 @@ export class HubSpotIntegration extends BaseIntegration {
       "create_deal",
       "update_deal",
       "get_deals",
+      // Business insights
+      "get_recent_contacts",
+      "get_pipeline_value",
+      "get_deal_stages"
     ];
   }
 }

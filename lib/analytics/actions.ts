@@ -21,6 +21,12 @@ export interface AnalyticsMetrics {
     total: number;
     change: number;
   };
+  // NEW: Agent type breakdown
+  agentTypes: {
+    customerAssistants: number;
+    businessAssistants: number;
+    toolInvocations: number; // Business Assistant tool usage
+  };
   timeline: Array<{
     date: string;
     conversations: number;
@@ -33,7 +39,7 @@ export interface AnalyticsMetrics {
     conversationCount: number;
     leadCount: number;
   }>;
-  knowledgeBase: { // NEW
+  knowledgeBase: {
     totalSearches: number;
     documentsUsed: number;
     avgRelevance: number;
@@ -44,7 +50,7 @@ export interface AnalyticsMetrics {
       usageCount: number;
     }>;
   };
-  integrations: { // NEW
+  integrations: {
     totalActions: number;
     byProvider: Array<{
       provider: string;
@@ -52,7 +58,7 @@ export interface AnalyticsMetrics {
       successRate: number;
     }>;
   };
-  webhooks: { // NEW
+  webhooks: {
     totalEvents: number;
     successRate: number;
     byType: Array<{
@@ -410,6 +416,17 @@ export async function getAnalyticsMetrics(
       getWebhookMetrics(profile.tenant_id, currentPeriodStart)
     ]);
 
+    // Calculate agent type breakdown
+    const customerAssistants = agents?.filter(a => 
+      a.type === 'customer_assistant' || a.type === 'support' || a.type === 'sales'
+    ).length || 0;
+    const businessAssistants = agents?.filter(a => 
+      a.type === 'business_assistant'
+    ).length || 0;
+    
+    // Tool invocations = integrations total actions (approximation of tool calls)
+    const toolInvocations = integrations.totalActions;
+
     const metrics: AnalyticsMetrics = {
       conversations: {
         total: conversationsTotal,
@@ -423,11 +440,16 @@ export async function getAnalyticsMetrics(
         total: activeAgentsTotal,
         change: activeAgentsChange,
       },
+      agentTypes: {
+        customerAssistants,
+        businessAssistants,
+        toolInvocations,
+      },
       timeline,
       topAgents,
-      knowledgeBase, // NEW
-      integrations, // NEW
-      webhooks, // NEW
+      knowledgeBase,
+      integrations,
+      webhooks,
     };
 
     return { metrics };

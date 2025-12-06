@@ -12,6 +12,7 @@ import { TopAgentsTable } from "@/components/analytics/top-agents-table";
 import { KnowledgeBaseStats } from "@/components/analytics/knowledge-base-stats";
 import { IntegrationUsage } from "@/components/analytics/integration-usage";
 import { WebhookActivity } from "@/components/analytics/webhook-activity";
+import { AgentTypesStats } from "@/components/analytics/agent-types-stats";
 import { MessageSquare, Users, Bot } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 
@@ -59,12 +60,17 @@ export default async function AnalyticsPage() {
   return (
     <div className="p-4 sm:p-6 md:p-8">
       <div className="mx-auto max-w-7xl space-y-6 sm:space-y-8">
-        {/* Header */}
-        <div>
-          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Analytics</h1>
-          <p className="text-sm sm:text-base text-muted-foreground mt-2">
-            Monitor your agent performance and activity
-          </p>
+        {/* Header with gradient */}
+        <div className="relative overflow-hidden rounded-xl bg-gradient-to-r from-slate-800 to-slate-700 p-6 sm:p-8 shadow-lg">
+          <div className="relative z-10">
+            <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-white">Analytics</h1>
+            <p className="text-sm sm:text-base text-slate-300 mt-2">
+              Monitor your agent performance and activity over time
+            </p>
+          </div>
+          {/* Decorative elements */}
+          <div className="absolute right-0 top-0 -mt-10 -mr-10 h-40 w-40 rounded-full bg-white/5" />
+          <div className="absolute right-20 bottom-0 -mb-6 h-24 w-24 rounded-full bg-white/5" />
         </div>
 
         {/* Metric Cards */}
@@ -75,6 +81,7 @@ export default async function AnalyticsPage() {
             change={metrics.conversations.change}
             icon={MessageSquare}
             description="Last 30 days"
+            variant="blue"
           />
           <MetricCard
             title="Leads Collected"
@@ -82,6 +89,7 @@ export default async function AnalyticsPage() {
             change={metrics.leads.change}
             icon={Users}
             description="Last 30 days"
+            variant="green"
           />
           <MetricCard
             title="Active Agents"
@@ -89,8 +97,12 @@ export default async function AnalyticsPage() {
             change={metrics.activeAgents.change}
             icon={Bot}
             description="Currently active"
+            variant="purple"
           />
         </div>
+
+        {/* Agent Types Breakdown */}
+        <AgentTypesStats metrics={metrics.agentTypes} />
 
         {/* Activity Chart */}
         <ConversationsChart data={metrics.timeline} />

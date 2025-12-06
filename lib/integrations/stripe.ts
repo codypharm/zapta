@@ -291,6 +291,136 @@ export class StripeIntegration extends BaseIntegration {
     };
   }
 
+  // ============================================================================
+  // BUSINESS ASSISTANT QUERY METHODS
+  // ============================================================================
+
+  /**
+   * Get revenue for a date range
+   * Used by Finance Assistant for revenue tracking
+   */
+  async getRevenue(
+    startDate: Date,
+    endDate: Date
+  ): Promise<{ total: number; currency: string; count: number}> {
+    const params = new URLSearchParams({
+      created: JSON.stringify({
+        gte: Math.floor(startDate.getTime() / 1000),
+        lte: Math.floor(endDate.getTime() / 1000),
+      }),
+      limit: '100'
+    });
+
+    const response = await fetch(
+      `https://api.stripe.com/v1/charges?${params}`,
+      {
+        headers: this.getAuthHeaders(),
+      }
+    );
+
+    if (!response.ok) {
+      throw new Error(`Failed to fetch revenue: ${response.statusText}`);
+    }
+
+    const data = await response.json();
+    
+    // Calculate total from successful charges
+    const successfulCharges = data.data.filter((charge: any) => charge.paid);
+    const total = successfulCharges.reduce((sum: number, charge: any) => sum + charge.amount, 0);
+
+    return {
+      total: total / 100, // Convert from cents
+      currency: successfulCharges[0]?.currency || 'usd',
+      count: successfulCharges.length
+    };
+  }
+
+  /**
+   * Get recent payments
+   * Used by Finance Assistant to track recent transactions
+   */
+  async getRecentPayments(limit: number = 10): Promise<StripePayment[]> {
+    const response = await fetch(
+      `https://api.stripe.com/v1/charges?limit=${limit}`,
+      {
+        headers: this.getAuthHeaders(),
+      }
+    );
+
+    if (!response.ok) {
+      throw new Error(`Failed to fetch payments: ${response.statusText}`);
+    }
+
+    const data = await response.json();
+    
+    return data.data.map((charge: any) => ({
+      id: charge.id,
+      amount: charge.amount / 100,
+      currency: charge.currency,
+      status: charge.paid ? 'succeeded' : 'failed',
+      metadata: charge.metadata,
+      created: new Date(charge.created * 1000).toISOString()
+    }));
+  }
+
+  /**
+   * Get failed charges
+   * Used by Finance Assistant to alert about payment issues
+   */
+  async getFailedCharges(limit: number = 20): Promise<Array<{
+    id: string;
+    amount: number;
+    currency: string;
+    customer: string;
+    failure_message: string;
+    created: string;
+  }>> {
+    const response = await fetch(
+      `https://api.stripe.com/v1/charges?limit=${limit}`,
+      {
+        headers: this.getAuthHeaders(),
+      }
+    );
+
+    if (!response.ok) {
+      throw new Error(`Failed to fetch charges: ${response.statusText}`);
+    }
+
+    const data = await response.json();
+    
+    // Filter for failed charges
+    const failedCharges = data.data.filter((charge: any) => !charge.paid);
+    
+    return failedCharges.map((charge: any) => ({
+      id: charge.id,
+      amount: charge.amount / 100,
+      currency: charge.currency,
+      customer: charge.customer || 'N/A',
+      failure_message: charge.failure_message || 'Unknown error',
+      created: new Date(charge.created * 1000).toISOString()
+    }));
+  }
+
+  /**
+   * Get total customer count
+   * Used by Finance Assistant for business metrics
+   */
+  async getCustomerCount(): Promise<number> {
+    const response = await fetch(
+      'https://api.stripe.com/v1/customers?limit=1',
+      {
+        headers: this.getAuthHeaders(),
+      }
+    );
+
+    if (!response.ok) {
+      throw new Error(`Failed to fetch customers: ${response.statusText}`);
+    }
+
+    const data = await response.json();
+    return data.total_count || 0;
+  }
+
   /**
    * Get Stripe integration capabilities
    */
@@ -303,6 +433,11 @@ export class StripeIntegration extends BaseIntegration {
       "refund_payment",
       "handle_webhooks",
       "manage_subscriptions",
+      // Business insights
+      "get_revenue",
+      "get_recent_payments",
+      "get_failed_charges",
+      "get_customer_count",
     ];
   }
 }

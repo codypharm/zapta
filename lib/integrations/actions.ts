@@ -372,15 +372,14 @@ export async function getAvailableProviders() {
     {
       id: "stripe",
       name: "Stripe",
-      description: "Process payments, create invoices, and manage subscriptions",
+      description: "Access revenue, payments, customer data, and billing metrics",
       type: "payment",
       icon: "💳",
-      coming_soon: true,
       features: [
-        "Payment processing",
-        "Invoice creation",
-        "Subscription management",
-        "Refund handling",
+        "Revenue queries",
+        "Payment history",
+        "Customer count",
+        "Failed charges tracking",
       ],
     },
     {
@@ -407,6 +406,32 @@ export async function getAvailableProviders() {
         "Deal creation",
         "Company sync",
         "OAuth 2.0",
+      ],
+    },
+    {
+      id: "google_drive",
+      name: "Google Drive",
+      description: "Access and search documents, spreadsheets, and files",
+      type: "document",
+      icon: "📁",
+      features: [
+        "File listing",
+        "Document reading",
+        "Search files",
+        "Spreadsheet access",
+      ],
+    },
+    {
+      id: "notion",
+      name: "Notion",
+      description: "Query databases and access Notion pages",
+      type: "document",
+      icon: "📝",
+      features: [
+        "Database queries",
+        "Page access",
+        "Search pages",
+        "Content retrieval",
       ],
     },
     {

@@ -7,8 +7,10 @@ import { createServerClient } from "@/lib/supabase/server";
 import { EmailIntegration } from "./email";
 import { HubSpotIntegration } from "./hubspot";
 import { GoogleCalendarIntegration } from "./google-calendar";
+import { GoogleDriveIntegration } from "./google-drive";
+import { NotionIntegration } from "./notion";
+import { StripeIntegration } from "./stripe";
 import { TwilioIntegration } from "./twilio";
-// import { StripeIntegration } from "./stripe"; // TODO: Enable for Enterprise custom features
 import type { Integration, IntegrationClass } from "./base";
 
 /**
@@ -147,25 +149,21 @@ function createIntegrationInstance(
       case "google_calendar":
         return new GoogleCalendarIntegration(decryptedIntegration);
 
+      case "google_drive":
+        return new GoogleDriveIntegration(decryptedIntegration);
+
+      case "notion":
+        return new NotionIntegration(decryptedIntegration);
+
+      case "stripe":
+        return new StripeIntegration(decryptedIntegration);
+
       case "twilio":
         return new TwilioIntegration(decryptedIntegration);
 
       case "webhook":
         const { WebhookIntegration } = require("./webhook");
         return new WebhookIntegration(decryptedIntegration);
-
-      // case "stripe": // TODO: Enable for Enterprise - payment processing is sensitive
-      //   return new StripeIntegration(decryptedIntegration);
-
-      // TODO: Add more integrations as they're implemented
-      // case "slack":
-      //   return new SlackIntegration(integration);
-      //
-      // case "twilio":
-      //   return new TwilioIntegration(integration);
-      //
-      // case "webhook":
-      //   return new WebhookIntegration(integration);
 
       default:
         console.warn(`Unknown integration provider: ${integration.provider}`);

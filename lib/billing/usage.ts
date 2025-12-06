@@ -111,7 +111,19 @@ export async function checkMessageLimit(tenantId: string): Promise<{
     throw new Error("Tenant not found");
   }
 
-  const planId = tenant.subscription_plan || "free";
+  // Check subscriptions table for active subscription (source of truth)
+  const { data: subscriptions } = await supabase
+    .from("subscriptions")
+    .select("plan_id, status")
+    .eq("tenant_id", tenantId)
+    .eq("status", "active")
+    .order("created_at", { ascending: false })
+    .limit(1);
+
+  const subscription = subscriptions?.[0];
+  
+  // Use subscription plan_id if available, fallback to tenants.subscription_plan
+  const planId = subscription?.plan_id || tenant.subscription_plan || "free";
   const current = tenant.usage_messages_month || 0;
   const allowed = canSendMessage(planId, current);
   const limits = getPlanLimits(planId);
@@ -228,7 +240,7 @@ export async function checkAgentLimit(tenantId: string): Promise<{
 }> {
   const supabase = await createServerClient();
 
-  // Get tenant plan
+  // Get tenant plan from tenants table (fallback)
   const { data: tenant } = await supabase
     .from("tenants")
     .select("subscription_plan")
@@ -239,6 +251,22 @@ export async function checkAgentLimit(tenantId: string): Promise<{
     throw new Error("Tenant not found");
   }
 
+  // Check subscriptions table for active subscription (source of truth)
+  const { data: subscriptions } = await supabase
+    .from("subscriptions")
+    .select("plan_id, status")
+    .eq("tenant_id", tenantId)
+    .eq("status", "active")
+    .order("created_at", { ascending: false })
+    .limit(1);
+
+  const subscription = subscriptions?.[0];
+  
+  // Use subscription plan_id if available, fallback to tenants.subscription_plan
+  const planId = subscription?.plan_id || tenant.subscription_plan || "free";
+  
+  console.log(`[checkAgentLimit] Tenant: ${tenantId}, Plan from subscriptions: ${subscription?.plan_id}, Plan from tenant: ${tenant.subscription_plan}, Using: ${planId}`);
+
   // Count active agents
   const { count } = await supabase
     .from("agents")
@@ -246,10 +274,11 @@ export async function checkAgentLimit(tenantId: string): Promise<{
     .eq("tenant_id", tenantId)
     .eq("status", "active");
 
-  const planId = tenant.subscription_plan || "free";
   const current = count || 0;
   const allowed = canCreateAgent(planId, current);
   const limits = getPlanLimits(planId);
+
+  console.log(`[checkAgentLimit] Current: ${current}, Limit: ${limits.agents}, Allowed: ${allowed}`);
 
   return {
     allowed,
@@ -258,3 +287,4 @@ export async function checkAgentLimit(tenantId: string): Promise<{
     planId,
   };
 }
+

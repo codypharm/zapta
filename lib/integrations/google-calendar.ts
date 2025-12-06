@@ -615,4 +615,100 @@ export class GoogleCalendarIntegration extends BaseIntegration {
       throw error;
     }
   }
+  // ============================================================================
+  // BUSINESS ASSISTANT QUERY METHODS
+  // ============================================================================
+
+  /**
+   * Get upcoming events
+   * Used by Executive Assistant to manage schedule
+   */
+  async getUpcomingEvents(days: number = 7): Promise<any[]> {
+    const timeMin = new Date();
+    const timeMax = new Date();
+    timeMax.setDate(timeMax.getDate() + days);
+
+    const params = new URLSearchParams({
+      maxResults: '50',
+      orderBy: 'startTime',
+      singleEvents: 'true',
+      timeMin: timeMin.toISOString(),
+      timeMax: timeMax.toISOString(),
+    });
+
+    try {
+      const result = await this.makeCalendarRequest<any>(`/calendars/primary/events?${params.toString()}`);
+      
+      return (result.items || []).map((event: any) => ({
+        id: event.id,
+        summary: event.summary,
+        description: event.description,
+        start: event.start.dateTime || event.start.date,
+        end: event.end.dateTime || event.end.date,
+        location: event.location,
+        attendees: event.attendees?.map((a: any) => a.email),
+        link: event.htmlLink
+      }));
+    } catch (error) {
+      console.error('Failed to get upcoming events:', error);
+      return [];
+    }
+  }
+
+  /**
+   * Get meeting summary for a specific date
+   * Used by Executive Assistant to brief the user
+   */
+  async getMeetingSummary(date: Date = new Date()): Promise<string> {
+    const startOfDay = new Date(date);
+    startOfDay.setHours(0, 0, 0, 0);
+    
+    const endOfDay = new Date(date);
+    endOfDay.setHours(23, 59, 59, 999);
+
+    const params = new URLSearchParams({
+      orderBy: 'startTime',
+      singleEvents: 'true',
+      timeMin: startOfDay.toISOString(),
+      timeMax: endOfDay.toISOString(),
+    });
+
+    try {
+      const result = await this.makeCalendarRequest<any>(`/calendars/primary/events?${params.toString()}`);
+      const events = result.items || [];
+      
+      if (events.length === 0) {
+        return `No meetings scheduled for ${date.toLocaleDateString()}.`;
+      }
+
+      const summary = events.map((event: any) => {
+        const time = event.start.dateTime 
+          ? new Date(event.start.dateTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+          : 'All Day';
+        return `- ${time}: ${event.summary}`;
+      }).join('\n');
+
+      return `You have ${events.length} meetings scheduled for ${date.toLocaleDateString()}:\n${summary}`;
+    } catch (error) {
+      console.error('Failed to get meeting summary:', error);
+      return 'Unable to retrieve meeting summary.';
+    }
+  }
+
+  /**
+   * Get Google Calendar capabilities
+   */
+  getCapabilities(): string[] {
+    return [
+      'create_event',
+      'update_event',
+      'delete_event',
+      'list_events',
+      'check_availability',
+      'find_available_slots',
+      // Business insights
+      'get_upcoming_events',
+      'get_meeting_summary'
+    ];
+  }
 }

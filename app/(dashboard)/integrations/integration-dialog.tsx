@@ -93,6 +93,12 @@ export function IntegrationDialog({
 
   // Get form fields based on provider type
   const getFormFields = (): FormField[] => {
+    // OAuth providers - return empty to trigger OAuth flow
+    const oauthProviders = ['google_calendar', 'google_drive', 'hubspot', 'notion'];
+    if (oauthProviders.includes(provider.id)) {
+      return [];
+    }
+
     switch (provider.type) {
       case "email":
         return [
@@ -454,9 +460,21 @@ export function IntegrationDialog({
                 <Button
                   type="button"
                   onClick={() => {
-                    // Use hyphen in URL to match API routes
-                    const routePath = provider.id.replace('_', '-');
-                    window.location.href = `/api/integrations/${routePath}/auth`;
+                    // Map provider IDs to their OAuth endpoint paths
+                    const oauthRoutes: Record<string, string> = {
+                      'google_calendar': '/api/integrations/google-calendar/auth',
+                      'google_drive': '/api/integrations/google-drive/auth',
+                      'hubspot': '/api/integrations/hubspot/auth',
+                      'notion': '/api/integrations/notion/connect',
+                    };
+                    const route = oauthRoutes[provider.id];
+                    if (route) {
+                      window.location.href = route;
+                    } else {
+                      // Fallback: try hyphenated /auth path
+                      const routePath = provider.id.replace('_', '-');
+                      window.location.href = `/api/integrations/${routePath}/auth`;
+                    }
                   }}
                   className="w-full max-w-sm"
                   size="lg"

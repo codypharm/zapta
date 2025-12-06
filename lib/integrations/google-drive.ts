@@ -1,319 +1,215 @@
 /**
  * Google Drive Integration
- * Handles file management and storage operations
+ * Handles file access and search for Analytics Assistant
  */
 
 import { BaseIntegration, type IntegrationConfigSchema } from "./base";
+import type { IntegrationRecord } from "./registry";
 
 interface GoogleDriveCredentials {
-  client_id: string;
-  client_secret: string;
-  redirect_uri: string;
   access_token?: string;
   refresh_token?: string;
+  token_expires_at?: number;
 }
 
 export class GoogleDriveIntegration extends BaseIntegration {
-  provider = "google_drive";
-  type = "storage" as const;
+  provider = "google-drive";
+  type = "document" as const;
 
-  private getAuthHeaders(): Record<string, string> {
-    const credentials = this.getCredentials();
+  private accessToken?: string;
+  private refreshToken?: string;
+  private tokenExpiresAt?: number;
 
-    if (!credentials.access_token) {
-      throw new Error("Google Drive integration not authenticated");
-    }
-
-    return {
-      Authorization: `Bearer ${credentials.access_token}`,
-      "Content-Type": "application/json",
-    };
-  }
-
-  protected getCredentials(): GoogleDriveCredentials {
-    // In a real implementation, this would fetch from secure storage
-    return {} as GoogleDriveCredentials;
+  constructor(integrationRecord: IntegrationRecord) {
+    super(integrationRecord);
+    
+    const creds = this.getCredentials() as GoogleDriveCredentials;
+    this.accessToken = creds?.access_token;
+    this.refreshToken = creds?.refresh_token;
+    this.tokenExpiresAt = creds?.token_expires_at;
   }
 
   /**
-   * Authenticate with Google OAuth 2.0
+   * Get OAuth authorization URL
    */
-  async authenticate(credentials: GoogleDriveCredentials): Promise<void> {
-    // Store credentials securely
-    console.log("Google Drive authentication initiated");
+  static getAuthorizationUrl(state: string): string {
+    const clientId = process.env.GOOGLE_CLIENT_ID;
+    const redirectUri = process.env.GOOGLE_REDIRECT_URI || 
+                        `${process.env.NEXT_PUBLIC_APP_URL}/api/integrations/google-drive/callback`;
+    
+    const scopes = [
+      'https://www.googleapis.com/auth/drive.readonly',
+      'https://www.googleapis.com/auth/drive.metadata.readonly'
+    ];
 
-    // Validate credentials format
-    if (!credentials.client_id || !credentials.client_secret) {
-      throw new Error("Client ID and client secret are required");
-    }
+    const params = new URLSearchParams({
+      client_id: clientId || '',
+      redirect_uri: redirectUri,
+      response_type: 'code',
+      scope: scopes.join(' '),
+      access_type: 'offline',
+      prompt: 'consent',
+      state,
+    });
 
-    // In a real implementation, this would:
-    // 1. Exchange authorization code for access tokens
-    // 2. Store tokens securely in database
-    // 3. Set up webhook subscriptions
-
-    // For now, just validate credentials format
-    if (!credentials.redirect_uri) {
-      throw new Error("Redirect URI is required");
-    }
+    return `https://accounts.google.com/o/oauth2/v2/auth?${params.toString()}`;
   }
 
   /**
-   * Test Google Drive connection
+   * Exchange code for token
+   * (Reusing similar logic to Calendar, but could be shared utility)
    */
+  static async exchangeCodeForToken(code: string): Promise<any> {
+    const redirectUri = process.env.GOOGLE_REDIRECT_URI || 
+                        `${process.env.NEXT_PUBLIC_APP_URL}/api/integrations/google-drive/callback`;
+    
+    const response = await fetch('https://oauth2.googleapis.com/token', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({
+        code,
+        client_id: process.env.GOOGLE_CLIENT_ID || '',
+        client_secret: process.env.GOOGLE_CLIENT_SECRET || '',
+        redirect_uri: redirectUri,
+        grant_type: 'authorization_code',
+      }),
+    });
+
+    if (!response.ok) throw new Error('Failed to exchange code');
+    return response.json();
+  }
+
+  private async ensureValidToken(): Promise<string> {
+    if (this.accessToken && this.tokenExpiresAt && this.tokenExpiresAt > Date.now() + 300000) {
+      return this.accessToken;
+    }
+    
+    if (!this.refreshToken) throw new Error('No refresh token');
+
+    const response = await fetch('https://oauth2.googleapis.com/token', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({
+        refresh_token: this.refreshToken,
+        client_id: process.env.GOOGLE_CLIENT_ID || '',
+        client_secret: process.env.GOOGLE_CLIENT_SECRET || '',
+        grant_type: 'refresh_token',
+      }),
+    });
+
+    if (!response.ok) throw new Error('Failed to refresh token');
+    
+    const data = await response.json();
+    this.accessToken = data.access_token;
+    this.tokenExpiresAt = Date.now() + data.expires_in * 1000;
+    
+    return this.accessToken!;
+  }
+
+  private async makeDriveRequest<T>(endpoint: string): Promise<T> {
+    const token = await this.ensureValidToken();
+    const response = await fetch(`https://www.googleapis.com/drive/v3${endpoint}`, {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+
+    if (!response.ok) throw new Error(`Drive API error: ${response.statusText}`);
+    return response.json();
+  }
+
+  async authenticate(): Promise<void> {
+    if (!this.accessToken) throw new Error('Not authenticated');
+  }
+
   async testConnection(): Promise<boolean> {
     try {
-      const credentials = this.getCredentials();
-
-      if (!credentials.access_token) {
-        console.log("No access token available for testing");
-        return false;
-      }
-
-      // Test API access by fetching user info
-      const response = await fetch(
-        "https://www.googleapis.com/drive/v3/about?fields=user",
-        {
-          headers: this.getAuthHeaders(),
-        }
-      );
-
-      if (response.ok) {
-        const data = await response.json();
-        console.log("Google Drive connection test successful");
-        return true;
-      } else {
-        console.error("Google Drive connection test failed");
-        return false;
-      }
-    } catch (error) {
-      console.error("Google Drive connection test error:", error);
+      await this.makeDriveRequest('/files?pageSize=1');
+      return true;
+    } catch {
       return false;
     }
   }
 
-  /**
-   * Execute Google Drive actions
-   */
   async executeAction(action: string, params: any): Promise<any> {
-    const credentials = this.getCredentials();
-
     switch (action) {
-      case "upload_file":
-        return this.uploadFile(params);
-
-      case "download_file":
-        return this.downloadFile(params.file_id);
-
-      case "list_files":
-        return this.listFiles(params.folder_id, params.query);
-
-      case "create_folder":
-        return this.createFolder(params.name, params.parent_folder_id);
-
-      case "search_files":
+      case 'list_files':
+        return this.listFiles(params.limit, params.query);
+      case 'read_document':
+        return this.readDocument(params.fileId);
+      case 'search_files':
         return this.searchFiles(params.query);
-
       default:
-        throw new Error(`Unknown Google Drive action: ${action}`);
+        throw new Error(`Unknown action: ${action}`);
     }
   }
 
-  /**
-   * Upload a file to Google Drive
-   */
-  private async uploadFile(fileData: {
-    name: string;
-    content: string | Buffer;
-    folder_id?: string;
-    mime_type?: string;
-  }): Promise<any> {
-    const formData = new FormData();
-
-    const metadata = {
-      name: fileData.name,
-      parents: fileData.folder_id ? [fileData.folder_id] : [],
-    };
-
-    formData.append(
-      "metadata",
-      new Blob([JSON.stringify(metadata)], { type: "application/json" })
-    );
-
-    // Handle different content types properly
-    if (typeof fileData.content === "string") {
-      formData.append("file", fileData.content);
-    } else {
-      // Convert Buffer to Uint8Array then to Blob for file upload
-      const uint8Array = new Uint8Array(fileData.content);
-      const blob = new Blob([uint8Array], { type: fileData.mime_type || 'application/octet-stream' });
-      formData.append("file", blob, fileData.name);
-    }
-
-    const response = await fetch(
-      "https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart",
-      {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${this.getCredentials().access_token}`,
-        },
-        body: formData,
-      }
-    );
-
-    if (!response.ok) {
-      throw new Error(`Failed to upload file: ${response.statusText}`);
-    }
-
-    return await response.json();
-  }
-
-  /**
-   * Download a file from Google Drive
-   */
-  private async downloadFile(fileId: string): Promise<any> {
-    const response = await fetch(
-      `https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`,
-      {
-        headers: this.getAuthHeaders(),
-      }
-    );
-
-    if (!response.ok) {
-      throw new Error(`Failed to download file: ${response.statusText}`);
-    }
-
-    return response.blob();
-  }
-
-  /**
-   * List files in a folder
-   */
-  private async listFiles(folderId?: string, query?: string): Promise<any[]> {
-    let url = "https://www.googleapis.com/drive/v3/files";
-    const params = new URLSearchParams({
-      pageSize: "100",
-      fields: "files(id,name,mimeType,size,createdTime,parents)",
-      orderBy: "createdTime desc",
-    });
-
-    if (folderId) {
-      params.append("q", `'${folderId}' in parents`);
-    }
-
-    if (query) {
-      params.append("q", `name contains '${query}'`);
-    }
-
-    const response = await fetch(`${url}?${params}`, {
-      headers: this.getAuthHeaders(),
-    });
-
-    if (!response.ok) {
-      throw new Error(`Failed to list files: ${response.statusText}`);
-    }
-
-    const data = await response.json();
-    return data.files || [];
-  }
-
-  /**
-   * Create a new folder
-   */
-  private async createFolder(
-    name: string,
-    parentFolderId?: string
-  ): Promise<any> {
-    const folderMetadata = {
-      name: name,
-      mimeType: "application/vnd.google-apps.folder",
-      parents: parentFolderId ? [parentFolderId] : [],
-    };
-
-    const response = await fetch("https://www.googleapis.com/drive/v3/files", {
-      method: "POST",
-      headers: this.getAuthHeaders(),
-      body: JSON.stringify(folderMetadata),
-    });
-
-    if (!response.ok) {
-      throw new Error(`Failed to create folder: ${response.statusText}`);
-    }
-
-    return await response.json();
-  }
-
-  /**
-   * Search for files
-   */
-  private async searchFiles(query: string): Promise<any[]> {
-    const response = await fetch(
-      `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(
-        query
-      )}&fields=files(id,name,mimeType,size,createdTime)`,
-      {
-        headers: this.getAuthHeaders(),
-      }
-    );
-
-    if (!response.ok) {
-      throw new Error(`Failed to search files: ${response.statusText}`);
-    }
-
-    const data = await response.json();
-    return data.files || [];
-  }
-
-  /**
-   * Get Google Drive integration config schema
-   */
   getConfigSchema(): IntegrationConfigSchema {
     return {
-      type: "oauth" as const,
-      auth_url: "https://accounts.google.com/oauth/authorize",
-      fields: [
-        {
-          key: "client_id",
-          label: "Client ID",
-          type: "text" as const,
-          required: true,
-          description: "Your Google Cloud project client ID",
-          placeholder: "your-client-id.apps.googleusercontent.com",
-        },
-        {
-          key: "client_secret",
-          label: "Client Secret",
-          type: "password" as const,
-          required: true,
-          description: "Your Google Cloud project client secret",
-          placeholder: "your-client-secret",
-        },
-        {
-          key: "redirect_uri",
-          label: "Redirect URI",
-          type: "url" as const,
-          required: true,
-          description: "OAuth redirect URI for your application",
-          placeholder: "https://your-domain.com/auth/google/callback",
-        },
-      ],
+      type: 'oauth',
+      auth_url: '/api/integrations/google-drive/connect',
+      fields: []
     };
   }
 
-  /**
-   * Get Google Drive integration capabilities
-   */
   getCapabilities(): string[] {
-    return [
-      "upload_file",
-      "download_file",
-      "list_files",
-      "create_folder",
-      "search_files",
-      "share_files",
-      "manage_permissions",
-    ];
+    return ['list_files', 'read_document', 'search_files'];
+  }
+
+  // ============================================================================
+  // BUSINESS ASSISTANT QUERY METHODS
+  // ============================================================================
+
+  /**
+   * List files
+   * Used by Analytics Assistant to find documents
+   */
+  async listFiles(limit: number = 10, query?: string): Promise<any[]> {
+    let q = "trashed = false";
+    if (query) {
+      q += ` and name contains '${query}'`;
+    }
+
+    const result = await this.makeDriveRequest<any>(
+      `/files?pageSize=${limit}&q=${encodeURIComponent(q)}&fields=files(id,name,mimeType,webViewLink,createdTime,modifiedTime)`
+    );
+
+    return result.files || [];
+  }
+
+  /**
+   * Search files
+   * Used by Analytics Assistant
+   */
+  async searchFiles(query: string): Promise<any[]> {
+    return this.listFiles(20, query);
+  }
+
+  /**
+   * Read document content (export to plain text)
+   * Used by Analytics Assistant to analyze content
+   */
+  async readDocument(fileId: string): Promise<string> {
+    const token = await this.ensureValidToken();
+    
+    // First get file metadata to check mime type
+    const meta = await this.makeDriveRequest<any>(`/files/${fileId}?fields=mimeType,name`);
+    
+    let url = `https://www.googleapis.com/drive/v3/files/${fileId}`;
+    
+    // If it's a Google Doc, export it
+    if (meta.mimeType === 'application/vnd.google-apps.document') {
+      url += '/export?mimeType=text/plain';
+    } else if (meta.mimeType === 'application/vnd.google-apps.spreadsheet') {
+      url += '/export?mimeType=text/csv'; // Export sheets as CSV
+    } else {
+      url += '?alt=media'; // Download binary content
+    }
+
+    const response = await fetch(url, {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+
+    if (!response.ok) throw new Error('Failed to read file content');
+    
+    return await response.text();
   }
 }
-
-export default GoogleDriveIntegration;
