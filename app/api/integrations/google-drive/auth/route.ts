@@ -3,6 +3,7 @@ import { createServerClient } from '@/lib/supabase/server';
 import { GoogleDriveIntegration } from '@/lib/integrations/google-drive';
 
 export async function GET(request: NextRequest) {
+  console.log('[GOOGLE DRIVE AUTH] Route hit - /api/integrations/google-drive/auth');
   try {
     const supabase = await createServerClient();
     

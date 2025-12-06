@@ -13,7 +13,7 @@ interface GoogleDriveCredentials {
 }
 
 export class GoogleDriveIntegration extends BaseIntegration {
-  provider = "google-drive";
+  provider = "google_drive";
   type = "document" as const;
 
   private accessToken?: string;
@@ -120,12 +120,18 @@ export class GoogleDriveIntegration extends BaseIntegration {
     if (!this.accessToken) throw new Error('Not authenticated');
   }
 
-  async testConnection(): Promise<boolean> {
+  async testConnection(): Promise<{ success: boolean; message?: string; error?: string }> {
     try {
-      await this.makeDriveRequest('/files?pageSize=1');
-      return true;
-    } catch {
-      return false;
+      console.log('[GOOGLE DRIVE] Testing connection...');
+      const result = await this.makeDriveRequest('/files?pageSize=1');
+      console.log('[GOOGLE DRIVE] Test connection success:', result);
+      return { success: true, message: 'Connected to Google Drive successfully' };
+    } catch (error) {
+      console.error('[GOOGLE DRIVE] Test connection error:', error);
+      return { 
+        success: false, 
+        error: error instanceof Error ? error.message : 'Failed to connect to Google Drive' 
+      };
     }
   }
 

@@ -70,7 +70,7 @@ export interface IntegrationClass {
   authenticate(credentials: any): Promise<void>;
 
   /** Test connection health */
-  testConnection(): Promise<boolean>;
+  testConnection(): Promise<boolean | { success: boolean; message?: string; error?: string }>;
 
   /** Execute an action (send message, create record, etc.) */
   executeAction(action: string, params: any): Promise<any>;
@@ -209,7 +209,7 @@ export abstract class BaseIntegration implements IntegrationClass {
   /**
    * Default test connection implementation
    */
-  async testConnection(): Promise<boolean> {
+  async testConnection(): Promise<boolean | { success: boolean; message?: string; error?: string }> {
     try {
       // Basic health check - override for specific logic
       return true;

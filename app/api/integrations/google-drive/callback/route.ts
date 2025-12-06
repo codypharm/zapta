@@ -3,6 +3,8 @@ import { GoogleDriveIntegration } from '@/lib/integrations/google-drive';
 import { encryptCredentials } from '@/lib/integrations/encryption';
 
 export async function GET(request: NextRequest) {
+  console.log('[GOOGLE DRIVE CALLBACK] Route hit - /api/integrations/google-drive/callback');
+  console.log('[GOOGLE DRIVE CALLBACK] URL:', request.url);
   try {
     // Get the app base URL for redirects
     const appUrl = process.env.NEXT_PUBLIC_APP_URL || 

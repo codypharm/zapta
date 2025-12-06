@@ -89,16 +89,17 @@ export function IntegrationCard({
       const result = await testIntegration(integration.id);
       console.log('[TEST] Test result:', result);
 
-      if (result.error) {
+      if ('error' in result && result.error) {
         throw new Error(result.error);
       }
 
       // Handle both boolean and object results
-      if (typeof result === 'object' && result.success !== undefined) {
+      const hasSuccess = 'success' in result;
+      if (hasSuccess) {
         console.log('[TEST] Showing toast - success:', result.success);
         toast({
           title: result.success ? "Connection Successful" : "Connection Failed",
-          description: result.message || (result.success ? `${getProviderName(integration.provider)} is working correctly` : "Failed to connect"),
+          description: ('message' in result && result.message) || (result.success ? `${getProviderName(integration.provider)} is working correctly` : "Failed to connect"),
           variant: result.success ? "default" : "destructive",
         });
       } else {
