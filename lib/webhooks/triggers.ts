@@ -17,6 +17,34 @@ export interface WebhookEventPayload {
 }
 
 /**
+ * Log webhook delivery attempt to database
+ */
+async function logWebhookDelivery(
+  tenantId: string,
+  integrationId: string | undefined,
+  eventType: string,
+  status: "success" | "failed",
+  attempts: number,
+  errorMessage?: string
+): Promise<void> {
+  try {
+    const supabase = await createServerClient();
+    await supabase.from("webhook_logs").insert({
+      tenant_id: tenantId,
+      integration_id: integrationId,
+      event_type: eventType,
+      status,
+      attempts,
+      error_message: errorMessage,
+      delivered_at: new Date().toISOString(),
+    });
+  } catch (error) {
+    // Don't let logging failures break the webhook flow
+    console.error("[WEBHOOK_LOG] Failed to log delivery:", error);
+  }
+}
+
+/**
  * Trigger webhook for an event
  * Sends webhook to configured webhook integrations for the tenant that match filters
  * and are allowed for this agent
@@ -72,8 +100,35 @@ export async function triggerWebhookEvent(
           data: eventData,
         };
 
-        await integration.executeAction("send", { payload });
-        console.log(`[WEBHOOK_TRIGGER] ✓ Sent ${eventType} webhook`);
+        // Retry logic with exponential backoff
+        const maxRetries = 3;
+        let lastError: Error | null = null;
+        
+        for (let attempt = 1; attempt <= maxRetries; attempt++) {
+          try {
+            await integration.executeAction("send", { payload });
+            console.log(`[WEBHOOK_TRIGGER] ✓ Sent ${eventType} webhook (attempt ${attempt})`);
+            
+            // Log successful delivery
+            await logWebhookDelivery(tenantId, (integration as any).integrationRecord?.id, eventType, "success", attempt);
+            return; // Success, exit retry loop
+          } catch (sendError) {
+            lastError = sendError instanceof Error ? sendError : new Error(String(sendError));
+            console.warn(`[WEBHOOK_TRIGGER] Attempt ${attempt}/${maxRetries} failed:`, lastError.message);
+            
+            if (attempt < maxRetries) {
+              // Exponential backoff: 1s, 2s, 4s
+              const delay = Math.pow(2, attempt - 1) * 1000;
+              console.log(`[WEBHOOK_TRIGGER] Retrying in ${delay}ms...`);
+              await new Promise(resolve => setTimeout(resolve, delay));
+            }
+          }
+        }
+        
+        // All retries failed
+        console.error(`[WEBHOOK_TRIGGER] All ${maxRetries} attempts failed for ${eventType}`);
+        await logWebhookDelivery(tenantId, (integration as any).integrationRecord?.id, eventType, "failed", maxRetries, lastError?.message);
+        
       } catch (error) {
         console.error(
           `[WEBHOOK_TRIGGER] Failed to send webhook:`,
@@ -130,3 +185,81 @@ export async function triggerAgentFailedEvent(
     success: false,
   });
 }
+
+/**
+ * Trigger lead created webhook
+ */
+export async function triggerLeadCreatedEvent(
+  tenantId: string,
+  agentId: string,
+  agentName: string,
+  lead: {
+    id: string;
+    name?: string;
+    email?: string;
+    phone?: string;
+    company?: string;
+    source?: string;
+  }
+): Promise<void> {
+  await triggerWebhookEvent(tenantId, agentId, "lead.created", {
+    agent_id: agentId,
+    agent_name: agentName,
+    lead_id: lead.id,
+    lead_name: lead.name,
+    lead_email: lead.email,
+    lead_phone: lead.phone,
+    lead_company: lead.company,
+    source: lead.source || "widget",
+    success: true,
+  });
+}
+
+/**
+ * Trigger new conversation webhook
+ */
+export async function triggerConversationNewEvent(
+  tenantId: string,
+  agentId: string,
+  agentName: string,
+  conversation: {
+    id: string;
+    visitor_id?: string;
+    source?: string;
+  }
+): Promise<void> {
+  await triggerWebhookEvent(tenantId, agentId, "conversation.new", {
+    agent_id: agentId,
+    agent_name: agentName,
+    conversation_id: conversation.id,
+    visitor_id: conversation.visitor_id,
+    source: conversation.source || "widget",
+    success: true,
+  });
+}
+
+/**
+ * Trigger conversation closed webhook
+ */
+export async function triggerConversationClosedEvent(
+  tenantId: string,
+  agentId: string,
+  agentName: string,
+  conversation: {
+    id: string;
+    visitor_id?: string;
+    messages_count?: number;
+    duration_seconds?: number;
+  }
+): Promise<void> {
+  await triggerWebhookEvent(tenantId, agentId, "conversation.closed", {
+    agent_id: agentId,
+    agent_name: agentName,
+    conversation_id: conversation.id,
+    visitor_id: conversation.visitor_id,
+    messages_count: conversation.messages_count,
+    duration_seconds: conversation.duration_seconds,
+    success: true,
+  });
+}
+

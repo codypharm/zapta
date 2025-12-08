@@ -15,6 +15,7 @@ import { trackSearchQuery, trackSearchHit, trackContextUsage } from "@/lib/knowl
 import {
   triggerAgentCompletedEvent,
   triggerAgentFailedEvent,
+  triggerConversationNewEvent,
 } from "@/lib/webhooks/triggers";
 import { executeAgent } from "@/lib/agents/execute"; // NEW - use unified agent execution
 
@@ -419,6 +420,20 @@ async function saveConversation(
           }).catch((error) => {
             console.error("Failed to send conversation notification:", error);
             // Don't fail the request if notification fails
+          });
+          
+          // Trigger conversation.new webhook (non-blocking)
+          triggerConversationNewEvent(
+            tenantId,
+            agentId,
+            agentData.name,
+            {
+              id: newConversation.id,
+              visitor_id: sessionId,
+              source: "widget",
+            }
+          ).catch((error) => {
+            console.error("Failed to trigger conversation.new webhook:", error);
           });
         }
       }

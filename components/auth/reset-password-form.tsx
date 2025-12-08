@@ -1,23 +1,23 @@
 /**
- * Login Form Component
- * Handles user authentication with email/password
+ * Reset Password Form Component
+ * Set new password after clicking email link
  */
 
 "use client";
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import Link from "next/link";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { PasswordInput } from "@/components/auth/password-input";
-import { login } from "@/lib/auth/actions";
+import { resetPassword } from "@/lib/auth/actions";
+import { CheckCircle } from "lucide-react";
 
-export function LoginForm() {
+export function ResetPasswordForm() {
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState(false);
   const [loading, setLoading] = useState(false);
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
@@ -27,14 +27,32 @@ export function LoginForm() {
 
     try {
       const formData = new FormData(e.currentTarget);
-      const result = await login(formData);
+      const password = formData.get("password") as string;
+      const confirmPassword = formData.get("confirmPassword") as string;
+
+      // Client-side validation
+      if (password !== confirmPassword) {
+        setError("Passwords do not match");
+        setLoading(false);
+        return;
+      }
+
+      if (password.length < 8) {
+        setError("Password must be at least 8 characters");
+        setLoading(false);
+        return;
+      }
+
+      const result = await resetPassword(formData);
 
       if (result.error) {
         setError(result.error);
       } else {
-        // Redirect to dashboard on success
-        router.push("/dashboard");
-        router.refresh();
+        setSuccess(true);
+        // Redirect to login after 3 seconds
+        setTimeout(() => {
+          router.push("/login");
+        }, 3000);
       }
     } catch (err) {
       setError("An unexpected error occurred. Please try again.");
@@ -43,11 +61,22 @@ export function LoginForm() {
     }
   }
 
+  if (success) {
+    return (
+      <div className="rounded-lg border bg-card p-6 text-center space-y-4">
+        <div className="flex justify-center">
+          <CheckCircle className="h-12 w-12 text-green-500" />
+        </div>
+        <h3 className="font-semibold text-lg">Password reset successful!</h3>
+        <p className="text-muted-foreground text-sm">
+          Your password has been updated. Redirecting to login...
+        </p>
+      </div>
+    );
+  }
+
   return (
-    <form 
-      onSubmit={handleSubmit} 
-      className="space-y-4"
-    >
+    <form onSubmit={handleSubmit} className="space-y-4">
       {/* Error alert */}
       {error && (
         <Alert variant="destructive">
@@ -55,37 +84,31 @@ export function LoginForm() {
         </Alert>
       )}
 
-      {/* Email field */}
+      {/* New password field */}
       <div className="space-y-2">
-        <Label htmlFor="email">Email</Label>
-        <Input
-          id="email"
-          name="email"
-          type="email"
-          placeholder="you@example.com"
-          required
-          autoComplete="email"
-          disabled={loading}
-        />
-      </div>
-
-      {/* Password field */}
-      <div className="space-y-2">
-        <div className="flex items-center justify-between">
-          <Label htmlFor="password">Password</Label>
-          <Link
-            href="/forgot-password"
-            className="text-sm text-primary hover:underline"
-          >
-            Forgot password?
-          </Link>
-        </div>
+        <Label htmlFor="password">New Password</Label>
         <PasswordInput
           id="password"
           name="password"
           placeholder="••••••••"
           required
-          autoComplete="current-password"
+          autoComplete="new-password"
+          disabled={loading}
+        />
+        <p className="text-xs text-muted-foreground">
+          Must be at least 8 characters
+        </p>
+      </div>
+
+      {/* Confirm password field */}
+      <div className="space-y-2">
+        <Label htmlFor="confirmPassword">Confirm Password</Label>
+        <PasswordInput
+          id="confirmPassword"
+          name="confirmPassword"
+          placeholder="••••••••"
+          required
+          autoComplete="new-password"
           disabled={loading}
         />
       </div>
@@ -118,10 +141,10 @@ export function LoginForm() {
                 d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
               />
             </svg>
-            Signing in...
+            Resetting...
           </span>
         ) : (
-          "Sign in →"
+          "Reset password"
         )}
       </Button>
     </form>

@@ -344,14 +344,27 @@ export async function testIntegration(id: string) {
 export async function getAvailableProviders() {
   return [
     {
+      id: "gmail",
+      name: "Gmail",
+      description: "Read inbox, search emails, and send messages via Gmail",
+      type: "email",
+      icon: "📬",
+      features: [
+        "Read inbox",
+        "Search emails",
+        "Send emails",
+        "Unread count",
+      ],
+    },
+    {
       id: "email",
-      name: "Email",
-      description: "Platform-wide email service - send and receive emails with zero setup",
+      name: "Email (Resend)",
+      description: "Platform-wide transactional email - notifications and agent emails",
       type: "email",
       icon: "📧",
       features: [
-        "Inbound emails",
-        "Outbound emails",
+        "Agent emails",
+        "Notifications",
         "Auto-responses",
         "Usage tracking",
       ],
@@ -409,6 +422,19 @@ export async function getAvailableProviders() {
       ],
     },
     {
+      id: "slack",
+      name: "Slack",
+      description: "Send messages and notifications to Slack channels",
+      type: "slack",
+      icon: "💬",
+      features: [
+        "Send messages",
+        "Direct messages",
+        "Channel listing",
+        "OAuth 2.0",
+      ],
+    },
+    {
       id: "google_drive",
       name: "Google Drive",
       description: "Access and search documents, spreadsheets, and files",
@@ -418,7 +444,33 @@ export async function getAvailableProviders() {
         "File listing",
         "Document reading",
         "Search files",
-        "Spreadsheet access",
+        "Folder access",
+      ],
+    },
+    {
+      id: "google_sheets",
+      name: "Google Sheets",
+      description: "Access and query spreadsheet data for reporting and analysis",
+      type: "document",
+      icon: "📊",
+      features: [
+        "Spreadsheet listing",
+        "Data reading",
+        "Search spreadsheets",
+        "Range queries",
+      ],
+    },
+    {
+      id: "google_docs",
+      name: "Google Docs",
+      description: "Access and search document content for knowledge retrieval",
+      type: "document",
+      icon: "📄",
+      features: [
+        "Document listing",
+        "Content reading",
+        "Search documents",
+        "Text extraction",
       ],
     },
     {

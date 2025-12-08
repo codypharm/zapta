@@ -31,7 +31,7 @@ Key responsibilities:
 
 Be concise, professional, and proactive. Always provide context and suggest next steps when relevant.`,
     tone: 'professional',
-    recommendedIntegrations: ['google-calendar', 'email', 'stripe'],
+    recommendedIntegrations: ['google_calendar', 'gmail', 'stripe', 'google_docs'],
     exampleQueries: [
       'What meetings do I have today?',
       'What was our revenue last month?',
@@ -56,7 +56,7 @@ Key responsibilities:
 
 Be proactive, results-oriented, and focused on helping close deals. Use data to drive decisions.`,
     tone: 'professional',
-    recommendedIntegrations: ['hubspot', 'email', 'google-calendar'],
+    recommendedIntegrations: ['hubspot', 'gmail', 'google_calendar'],
     exampleQueries: [
       'Show me deals in the pipeline',
       'What\'s our total pipeline value?',
@@ -81,7 +81,7 @@ Key responsibilities:
 
 Be precise, data-driven, and detail-oriented. Always cite specific numbers and time periods.`,
     tone: 'professional',
-    recommendedIntegrations: ['stripe', 'email'],
+    recommendedIntegrations: ['stripe', 'gmail', 'google_sheets'],
     exampleQueries: [
       'What was our revenue this month?',
       'Show me failed charges this week',
@@ -106,7 +106,7 @@ Key responsibilities:
 
 Be empathetic, customer-focused, and proactive about identifying issues before they escalate.`,
     tone: 'friendly',
-    recommendedIntegrations: ['hubspot', 'email', 'stripe'],
+    recommendedIntegrations: ['hubspot', 'gmail', 'stripe'],
     exampleQueries: [
       'Show me customers with failed payments',
       'Who needs a check-in this week?',
@@ -131,7 +131,7 @@ Key responsibilities:
 
 Be systematic, organized, and efficiency-focused. Look for opportunities to streamline and improve processes.`,
     tone: 'professional',
-    recommendedIntegrations: ['google-drive', 'notion', 'email'],
+    recommendedIntegrations: ['google_drive', 'google_docs', 'google_sheets', 'notion', 'gmail'],
     exampleQueries: [
       'Find the Q4 planning document',
       'What\'s in our procedures database?',
@@ -181,7 +181,7 @@ Key responsibilities:
 
 Be analytical, precise, and insight-driven. Always provide context and explain what the data means.`,
     tone: 'professional',
-    recommendedIntegrations: ['stripe', 'hubspot', 'google-drive'],
+    recommendedIntegrations: ['stripe', 'hubspot', 'google_sheets', 'google_drive'],
     exampleQueries: [
       'Compare revenue this month vs last month',
       'Show me customer growth trends',
@@ -206,7 +206,7 @@ Key responsibilities:
 
 Be versatile, helpful, and context-aware. Ask clarifying questions when needed and suggest the best tools for each task.`,
     tone: 'professional',
-    recommendedIntegrations: ['email', 'google-calendar', 'stripe', 'hubspot'],
+    recommendedIntegrations: ['gmail', 'google_calendar', 'stripe', 'hubspot', 'google_docs'],
     exampleQueries: [
       'What do I need to know today?',
       'Check my calendar and revenue',

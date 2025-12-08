@@ -8,7 +8,7 @@ import {
   getIntegrations,
   getAvailableProviders,
 } from "@/lib/integrations/actions";
-import { IntegrationsClient } from "./client";
+import IntegrationsClient from "./client";
 import { ReturnToAgentBanner } from "@/components/agents/return-to-agent-banner";
 
 export const dynamic = "force-dynamic";

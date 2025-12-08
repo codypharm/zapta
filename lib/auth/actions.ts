@@ -171,3 +171,78 @@ export async function logout() {
   revalidatePath("/", "layout");
   redirect("/login");
 }
+
+/**
+ * Send password reset email
+ *
+ * @param formData - Form data containing email
+ * @returns Object with success status or error message
+ */
+export async function forgotPassword(formData: FormData) {
+  const supabase = await createServerClient();
+
+  const email = formData.get("email") as string;
+
+  if (!email) {
+    return { error: "Email is required" };
+  }
+
+  try {
+    // Get the app URL for the reset link
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL || 
+                   process.env.NEXT_PUBLIC_SITE_URL ||
+                   (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 
+                   'http://localhost:3000');
+
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: `${appUrl}/reset-password`,
+    });
+
+    if (error) {
+      // Don't reveal if email exists or not for security
+      console.error("Password reset error:", error);
+    }
+
+    // Always return success to prevent email enumeration
+    return { success: true };
+  } catch (error) {
+    console.error("Forgot password error:", error);
+    return { error: "An unexpected error occurred" };
+  }
+}
+
+/**
+ * Reset password with new password
+ *
+ * @param formData - Form data containing new password
+ * @returns Object with success status or error message
+ */
+export async function resetPassword(formData: FormData) {
+  const supabase = await createServerClient();
+
+  const password = formData.get("password") as string;
+
+  if (!password) {
+    return { error: "Password is required" };
+  }
+
+  if (password.length < 8) {
+    return { error: "Password must be at least 8 characters" };
+  }
+
+  try {
+    const { error } = await supabase.auth.updateUser({
+      password,
+    });
+
+    if (error) {
+      console.error("Password update error:", error);
+      return { error: "Failed to update password. The reset link may have expired." };
+    }
+
+    return { success: true };
+  } catch (error) {
+    console.error("Reset password error:", error);
+    return { error: "An unexpected error occurred" };
+  }
+}

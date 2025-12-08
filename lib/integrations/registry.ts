@@ -5,12 +5,16 @@
 
 import { createServerClient } from "@/lib/supabase/server";
 import { EmailIntegration } from "./email";
+import { GmailIntegration } from "./gmail";
 import { HubSpotIntegration } from "./hubspot";
 import { GoogleCalendarIntegration } from "./google-calendar";
 import { GoogleDriveIntegration } from "./google-drive";
+import { GoogleSheetsIntegration } from "./google-sheets";
+import { GoogleDocsIntegration } from "./google-docs";
 import { NotionIntegration } from "./notion";
 import { StripeIntegration } from "./stripe";
 import { TwilioIntegration } from "./twilio";
+import { SlackIntegration } from "./slack";
 import type { Integration, IntegrationClass } from "./base";
 
 /**
@@ -143,6 +147,9 @@ function createIntegrationInstance(
       case "email":
         return new EmailIntegration(decryptedIntegration);
 
+      case "gmail":
+        return new GmailIntegration(decryptedIntegration);
+
       case "hubspot":
         return new HubSpotIntegration(decryptedIntegration);
 
@@ -151,6 +158,12 @@ function createIntegrationInstance(
 
       case "google_drive":
         return new GoogleDriveIntegration(decryptedIntegration);
+
+      case "google_sheets":
+        return new GoogleSheetsIntegration(decryptedIntegration);
+
+      case "google_docs":
+        return new GoogleDocsIntegration(decryptedIntegration);
 
       case "notion":
         return new NotionIntegration(decryptedIntegration);
@@ -164,6 +177,9 @@ function createIntegrationInstance(
       case "webhook":
         const { WebhookIntegration } = require("./webhook");
         return new WebhookIntegration(decryptedIntegration);
+
+      case "slack":
+        return new SlackIntegration(decryptedIntegration as any);
 
       default:
         console.warn(`Unknown integration provider: ${integration.provider}`);

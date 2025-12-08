@@ -172,6 +172,25 @@ export async function POST(
         console.error("Failed to send lead notification:", error);
         // Don't fail the request if notification fails
       });
+
+      // Trigger lead.created webhook (non-blocking)
+      import("@/lib/webhooks/triggers").then(({ triggerLeadCreatedEvent }) => {
+        triggerLeadCreatedEvent(
+          agent.tenant_id,
+          agentId,
+          agent.name,
+          {
+            id: newLead.id,
+            name: newLead.name,
+            email: newLead.email,
+            phone: newLead.phone,
+            company: newLead.company,
+            source: "widget",
+          }
+        ).catch((error) => {
+          console.error("Failed to trigger lead.created webhook:", error);
+        });
+      });
     }
 
     // Return success with lead ID
