@@ -253,14 +253,24 @@ export class TwilioIntegration extends BaseIntegration {
       process.env.SUPABASE_SERVICE_ROLE_KEY!
     );
 
-    // Get tenant's subscription plan
+    // Get tenant's subscription plan - check subscriptions table first
     const { data: tenant } = await supabase
       .from("tenants")
       .select("subscription_plan")
       .eq("id", tenantId)
       .single();
 
-    const planId = tenant?.subscription_plan || "free";
+    // Check subscriptions table first (source of truth for paid plans)
+    const { data: subscriptions } = await supabase
+      .from("subscriptions")
+      .select("plan_id, status")
+      .eq("tenant_id", tenantId)
+      .eq("status", "active")
+      .order("created_at", { ascending: false })
+      .limit(1);
+
+    const subscription = subscriptions?.[0];
+    const planId = subscription?.plan_id || tenant?.subscription_plan || "free";
     const planLimits = getPlanLimits(planId);
 
     // Count SMS sent this month

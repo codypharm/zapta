@@ -39,6 +39,10 @@ const CUSTOMER_AGENT_TYPES = [
 const AI_MODELS = [
   // Gemini 3 (Latest - Best Overall)
   { value: "gemini-3-pro", label: "Gemini 3 Pro ⭐ NEW" },
+  // Gemini 2.5 
+  { value: "gemini-2.5-pro", label: "Gemini 2.5 Pro" },
+  { value: "gemini-2.5-flash", label: "Gemini 2.5 Flash" },
+  { value: "gemini-2.5-flash-lite", label: "Gemini 2.5 Flash-Lite (Fast)" },
   // Gemini 2.0
   { value: "gemini-2.0-flash", label: "Gemini 2.0 Flash" },
   { value: "gemini-2.0-flash-thinking", label: "Gemini 2.0 Flash Thinking" },
@@ -744,18 +748,23 @@ export default function CreateAgentPage() {
                   <div className="space-y-3">
                     {availableIntegrations.map((integration) => {
                       const isRecommended = selectedTemplate?.recommendedIntegrations.includes(integration.provider);
+                      const { canUseIntegration } = require("@/lib/billing/plans");
+                      const isAllowed = canUseIntegration(userPlan, integration.provider);
                       
                       return (
                         <div 
                           key={integration.id} 
                           className={`flex items-start space-x-3 p-3 rounded-lg border transition-colors ${
+                            !isAllowed ? 'opacity-50 bg-muted/30' :
                             isRecommended ? 'border-primary/50 bg-primary/5' : 'hover:bg-muted/50'
                           }`}
                         >
                           <Checkbox
                             id={integration.id}
                             checked={selectedIntegrations.includes(integration.id)}
+                            disabled={!isAllowed}
                             onCheckedChange={(checked) => {
+                              if (!isAllowed) return;
                               if (checked) {
                                 setSelectedIntegrations([...selectedIntegrations, integration.id]);
                               } else {
@@ -772,9 +781,14 @@ export default function CreateAgentPage() {
                               <Badge variant={integration.status === 'connected' ? 'default' : 'secondary'}>
                                 {integration.status}
                               </Badge>
-                              {isRecommended && (
+                              {isRecommended && isAllowed && (
                                 <Badge variant="outline" className="text-xs border-primary text-primary">
                                   Recommended
+                                </Badge>
+                              )}
+                              {!isAllowed && (
+                                <Badge variant="outline" className="text-xs">
+                                  Upgrade
                                 </Badge>
                               )}
                             </div>

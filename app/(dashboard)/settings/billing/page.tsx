@@ -160,13 +160,14 @@ export default async function BillingPage() {
             <CardDescription>What's included in your current plan</CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="grid gap-4 sm:grid-cols-2">
+            <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-3">
               <div>
                 <p className="font-medium">AI Models</p>
                 <p className="text-sm text-muted-foreground">
                   {planLimits.models === '*' 
                     ? 'All models available' 
-                    : (planLimits.models as readonly string[]).join(', ')
+                    : (planLimits.models as readonly string[]).slice(0, 3).join(', ') + 
+                      ((planLimits.models as readonly string[]).length > 3 ? '...' : '')
                   }
                 </p>
               </div>
@@ -197,6 +198,48 @@ export default async function BillingPage() {
                       ? 'Not available'
                       : `${planLimits.integrations.sms}/month`
                   }
+                </p>
+              </div>
+              <div>
+                <p className="font-medium">Calendar</p>
+                <p className="text-sm text-muted-foreground">
+                  {planLimits.integrations.calendar ? '✓ Available' : '✗ Not available'}
+                </p>
+              </div>
+              <div>
+                <p className="font-medium">Google Drive</p>
+                <p className="text-sm text-muted-foreground">
+                  {planLimits.integrations.google_drive ? '✓ Available' : '✗ Not available'}
+                </p>
+              </div>
+              <div>
+                <p className="font-medium">Notion</p>
+                <p className="text-sm text-muted-foreground">
+                  {planLimits.integrations.notion ? '✓ Available' : '✗ Not available'}
+                </p>
+              </div>
+              <div>
+                <p className="font-medium">HubSpot</p>
+                <p className="text-sm text-muted-foreground">
+                  {planLimits.integrations.hubspot ? '✓ Available' : '✗ Not available'}
+                </p>
+              </div>
+              <div>
+                <p className="font-medium">Stripe</p>
+                <p className="text-sm text-muted-foreground">
+                  {planLimits.integrations.stripe ? '✓ Available' : '✗ Not available'}
+                </p>
+              </div>
+              <div>
+                <p className="font-medium">Webhooks</p>
+                <p className="text-sm text-muted-foreground">
+                  {planLimits.integrations.webhooks ? '✓ Available' : '✗ Not available'}
+                </p>
+              </div>
+              <div>
+                <p className="font-medium">Slack</p>
+                <p className="text-sm text-muted-foreground">
+                  {planLimits.integrations.slack ? '✓ Available' : '✗ Not available'}
                 </p>
               </div>
             </div>

@@ -22,7 +22,7 @@ export async function checkStorageLimit(
 }> {
   const supabase = await createServerClient();
 
-  // Get tenant's subscription plan
+  // Get tenant's usage data
   const { data: tenant } = await supabase
     .from("tenants")
     .select("subscription_plan, usage_storage_bytes")
@@ -33,7 +33,19 @@ export async function checkStorageLimit(
     throw new Error("Tenant not found");
   }
 
-  const planId = tenant.subscription_plan || "free";
+  // Check subscriptions table first (source of truth for paid plans)
+  const { data: subscriptions } = await supabase
+    .from("subscriptions")
+    .select("plan_id, status")
+    .eq("tenant_id", tenantId)
+    .eq("status", "active")
+    .order("created_at", { ascending: false })
+    .limit(1);
+
+  const subscription = subscriptions?.[0];
+  
+  // Use subscription plan_id if available, fallback to tenants.subscription_plan
+  const planId = subscription?.plan_id || tenant.subscription_plan || "free";
   const planLimits = getPlanLimits(planId);
   
   const currentBytes = tenant.usage_storage_bytes || 0;

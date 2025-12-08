@@ -9,6 +9,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
+import { canUseModel, canUseIntegration } from "@/lib/billing/plans";
 import {
   Select,
   SelectContent,
@@ -29,11 +30,26 @@ const AGENT_TYPES = [
 ];
 
 const AI_MODELS = [
-  { value: "gemini-1.5-flash", label: "Gemini 2.5 Flash (Free, Fast)" },
-  { value: "gemini-2.5-flash", label: "Gemini 2.5 Flash (Free, Fast)" },
-  { value: "gemini-1.5-pro", label: "Gemini 2.5 Pro (Free, Smart)" },
-  { value: "claude-3-5-sonnet", label: "Claude 3.5 Sonnet" },
-  { value: "gpt-4", label: "GPT-4" },
+  // Gemini 3 (Latest - Best Overall)
+  { value: "gemini-3-pro", label: "Gemini 3 Pro ⭐ NEW" },
+  // Gemini 2.5 
+  { value: "gemini-2.5-pro", label: "Gemini 2.5 Pro" },
+  { value: "gemini-2.5-flash", label: "Gemini 2.5 Flash" },
+  { value: "gemini-2.5-flash-lite", label: "Gemini 2.5 Flash-Lite (Fast)" },
+  // Gemini 2.0
+  { value: "gemini-2.0-flash", label: "Gemini 2.0 Flash" },
+  { value: "gemini-2.0-flash-thinking", label: "Gemini 2.0 Flash Thinking" },
+  // Gemini 1.5
+  { value: "gemini-1.5-flash", label: "Gemini 1.5 Flash" },
+  { value: "gemini-1.5-flash-8b", label: "Gemini 1.5 Flash 8B" },
+  { value: "gemini-1.5-pro", label: "Gemini 1.5 Pro" },
+  // Claude 3.5
+  { value: "claude-3.5-sonnet", label: "Claude 3.5 Sonnet" },
+  { value: "claude-3.5-haiku", label: "Claude 3.5 Haiku" },
+  // OpenAI
+  { value: "gpt-4o", label: "GPT-4o" },
+  { value: "gpt-4.5", label: "GPT-4.5" },
+  { value: "gpt-5", label: "GPT-5 ⭐ NEW" },
   { value: "gpt-3.5-turbo", label: "GPT-3.5 Turbo" },
 ];
 
@@ -63,6 +79,7 @@ export function AgentEditForm({ agent }: AgentEditFormProps) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [userPlan, setUserPlan] = useState<string>('free');
   
   // Integration states
   const [selectedIntegrations, setSelectedIntegrations] = useState<string[]>([]);
@@ -98,11 +115,46 @@ export function AgentEditForm({ agent }: AgentEditFormProps) {
     },
   });
 
-  // Load integrations on mount
+  // Load integrations and user plan on mount
   useEffect(() => {
     const loadData = async () => {
       setLoadingIntegrations(true);
       try {
+        const { createClient } = await import("@/lib/supabase/client");
+        const supabase = createClient();
+        
+        // Load user plan
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
+          const { data: profile } = await supabase
+            .from('profiles')
+            .select('tenant_id')
+            .eq('id', user.id)
+            .single();
+          
+          if (profile?.tenant_id) {
+            const { data: subscription } = await supabase
+              .from('subscriptions')
+              .select('plan_id')
+              .eq('tenant_id', profile.tenant_id)
+              .eq('status', 'active')
+              .single();
+            
+            if (subscription?.plan_id) {
+              setUserPlan(subscription.plan_id);
+            } else {
+              const { data: tenant } = await supabase
+                .from('tenants')
+                .select('subscription_plan')
+                .eq('id', profile.tenant_id)
+                .single();
+              if (tenant?.subscription_plan) {
+                setUserPlan(tenant.subscription_plan);
+              }
+            }
+          }
+        }
+        
         // Load available integrations
         const { getIntegrations } = await import("@/lib/integrations/actions");
         const result = await getIntegrations();
@@ -111,8 +163,6 @@ export function AgentEditForm({ agent }: AgentEditFormProps) {
         }
 
         // Load agent's current integrations
-        const { createClient } = await import("@/lib/supabase/client");
-        const supabase = createClient();
         const { data: agentIntegrations } = await supabase
           .from('agent_integrations')
           .select('integration_id')
@@ -122,7 +172,7 @@ export function AgentEditForm({ agent }: AgentEditFormProps) {
           setSelectedIntegrations(agentIntegrations.map(ai => ai.integration_id));
         }
       } catch (err) {
-        console.error("Failed to load integrations:", err);
+        console.error("Failed to load data:", err);
       } finally {
         setLoadingIntegrations(false);
       }
@@ -277,11 +327,26 @@ export function AgentEditForm({ agent }: AgentEditFormProps) {
                       <SelectValue placeholder="Select a model" />
                     </SelectTrigger>
                     <SelectContent>
-                      {AI_MODELS.map((model) => (
-                        <SelectItem key={model.value} value={model.value}>
-                          {model.label}
-                        </SelectItem>
-                      ))}
+                      {AI_MODELS.map((model) => {
+                        const isAllowed = canUseModel(userPlan, model.value);
+                        return (
+                          <SelectItem 
+                            key={model.value} 
+                            value={model.value}
+                            disabled={!isAllowed}
+                            className={!isAllowed ? "opacity-50" : ""}
+                          >
+                            <div className="flex items-center justify-between w-full">
+                              <span>{model.label}</span>
+                              {!isAllowed && (
+                                <Badge variant="outline" className="ml-2 text-xs">
+                                  Upgrade
+                                </Badge>
+                              )}
+                            </div>
+                          </SelectItem>
+                        );
+                      })}
                     </SelectContent>
                   </Select>
                 </div>
@@ -345,37 +410,53 @@ export function AgentEditForm({ agent }: AgentEditFormProps) {
                     Grant this agent access to specific integrations. It will only be able to use the ones you select.
                   </p>
                   <div className="space-y-3">
-                    {availableIntegrations.map((integration) => (
-                      <div key={integration.id} className="flex items-start space-x-3 p-3 rounded-lg border hover:bg-muted/50 transition-colors">
-                        <Checkbox
-                          id={`edit-${integration.id}`}
-                          checked={selectedIntegrations.includes(integration.id)}
-                          onCheckedChange={(checked) => {
-                            if (checked) {
-                              setSelectedIntegrations([...selectedIntegrations, integration.id]);
-                            } else {
-                              setSelectedIntegrations(
-                                selectedIntegrations.filter(id => id !== integration.id)
-                              );
-                            }
-                          }}
-                          className="mt-1"
-                        />
-                        <label htmlFor={`edit-${integration.id}`} className="flex-1 cursor-pointer">
-                          <div className="flex items-center gap-2 mb-1">
-                            <span className="font-medium capitalize">{integration.provider}</span>
-                            <Badge variant={integration.status === 'connected' ? 'default' : 'secondary'}>
-                              {integration.status}
-                            </Badge>
-                          </div>
-                          {integration.config?.webhook_url && (
-                            <p className="text-xs text-muted-foreground">
-                              {integration.config.webhook_url}
-                            </p>
-                          )}
-                        </label>
-                      </div>
-                    ))}
+                    {availableIntegrations.map((integration) => {
+                      const isAllowed = canUseIntegration(userPlan, integration.provider);
+                      
+                      return (
+                        <div 
+                          key={integration.id} 
+                          className={`flex items-start space-x-3 p-3 rounded-lg border transition-colors ${
+                            !isAllowed ? 'opacity-50 bg-muted/30' : 'hover:bg-muted/50'
+                          }`}
+                        >
+                          <Checkbox
+                            id={`edit-${integration.id}`}
+                            checked={selectedIntegrations.includes(integration.id)}
+                            disabled={!isAllowed}
+                            onCheckedChange={(checked) => {
+                              if (!isAllowed) return;
+                              if (checked) {
+                                setSelectedIntegrations([...selectedIntegrations, integration.id]);
+                              } else {
+                                setSelectedIntegrations(
+                                  selectedIntegrations.filter(id => id !== integration.id)
+                                );
+                              }
+                            }}
+                            className="mt-1"
+                          />
+                          <label htmlFor={`edit-${integration.id}`} className="flex-1 cursor-pointer">
+                            <div className="flex items-center gap-2 mb-1">
+                              <span className="font-medium capitalize">{integration.provider}</span>
+                              <Badge variant={integration.status === 'connected' ? 'default' : 'secondary'}>
+                                {integration.status}
+                              </Badge>
+                              {!isAllowed && (
+                                <Badge variant="outline" className="text-xs">
+                                  Upgrade
+                                </Badge>
+                              )}
+                            </div>
+                            {integration.config?.webhook_url && (
+                              <p className="text-xs text-muted-foreground">
+                                {integration.config.webhook_url}
+                              </p>
+                            )}
+                          </label>
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
               )}

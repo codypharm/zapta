@@ -147,7 +147,7 @@ export async function validateSubscription(tenantId: string): Promise<{
 }> {
   const supabase = await createServerClient();
 
-  // Get tenant and subscription info
+  // Get tenant info
   const { data: tenant } = await supabase
     .from("tenants")
     .select("subscription_plan")
@@ -158,19 +158,22 @@ export async function validateSubscription(tenantId: string): Promise<{
     return { valid: false, reason: "Tenant not found" };
   }
 
-  const planId = tenant.subscription_plan || "free";
+  // Check subscription record for paid plans (source of truth)
+  const { data: subscription } = await supabase
+    .from("subscriptions")
+    .select("plan_id, status, current_period_end, cancel_at_period_end")
+    .eq("tenant_id", tenantId)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .single();
+
+  // Use subscription plan_id if available, fallback to tenants.subscription_plan
+  const planId = subscription?.plan_id || tenant.subscription_plan || "free";
 
   // Free plan - always valid (no expiry)
   if (planId === "free") {
     return { valid: true };
   }
-
-  // Check subscription record for paid plans
-  const { data: subscription } = await supabase
-    .from("subscriptions")
-    .select("status, current_period_end, cancel_at_period_end")
-    .eq("tenant_id", tenantId)
-    .single();
 
   if (!subscription) {
     // No subscription record but not on free plan - downgrade to free

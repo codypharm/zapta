@@ -206,10 +206,50 @@ export async function getIntegrationMap(
   agentId?: string
 ): Promise<Map<string, IntegrationClass>> {
   let integrations = await getTenantIntegrations(tenantId, "connected");
+  const supabase = await createServerClient();
   
-  // If agentId provided, filter by agent's allowed integrations
+  // Fetch tenant's subscription plan for filtering
+  let planId = 'free';
+  try {
+    // Check subscriptions table first (source of truth)
+    const { data: subscriptions } = await supabase
+      .from("subscriptions")
+      .select("plan_id")
+      .eq("tenant_id", tenantId)
+      .eq("status", "active")
+      .order("created_at", { ascending: false })
+      .limit(1);
+    
+    if (subscriptions?.[0]?.plan_id) {
+      planId = subscriptions[0].plan_id;
+    } else {
+      // Fallback to tenants table
+      const { data: tenant } = await supabase
+        .from("tenants")
+        .select("subscription_plan")
+        .eq("id", tenantId)
+        .single();
+      
+      if (tenant?.subscription_plan) {
+        planId = tenant.subscription_plan;
+      }
+    }
+  } catch (error) {
+    console.error("[REGISTRY] Failed to fetch plan:", error);
+  }
+  
+  // Filter integrations based on plan - import dynamically to avoid circular deps
+  const { canUseIntegration } = await import("@/lib/billing/plans");
+  integrations = integrations.filter((integration) => {
+    const allowed = canUseIntegration(planId, integration.provider);
+    if (!allowed) {
+      console.log(`[REGISTRY] Integration ${integration.provider} not allowed on ${planId} plan`);
+    }
+    return allowed;
+  });
+  
+  // If agentId provided, further filter by agent's allowed integrations
   if (agentId) {
-    const supabase = await createServerClient();
     const { data: agent } = await supabase
       .from("agents")
       .select("config")

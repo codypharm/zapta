@@ -226,8 +226,12 @@ export function AgentCard({ agent, conversationCount = 0 }: AgentCardProps) {
             <Button asChild className="flex-1 h-9" size="sm">
               <Link href={`/agents/${agent.id}`}>
                 <PlayCircle className="w-4 h-4 mr-1.5" />
-                <span className="hidden sm:inline">Test Agent</span>
-                <span className="sm:hidden">Test</span>
+                <span className="hidden sm:inline">
+                  {agent.type === 'business_assistant' ? 'Chat' : 'Test Agent'}
+                </span>
+                <span className="sm:hidden">
+                  {agent.type === 'business_assistant' ? 'Chat' : 'Test'}
+                </span>
               </Link>
             </Button>
             <Button asChild variant="outline" size="sm" className="h-9 px-3">

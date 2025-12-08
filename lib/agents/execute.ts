@@ -78,14 +78,28 @@ export async function executeAgent(
       const { validateSubscription, checkMessageLimit, incrementMessageUsage } = await import("@/lib/billing/usage");
       const { canUseModel, getPlanLimits } = await import("@/lib/billing/plans");
       
-      // Get tenant's subscription plan
+      // Get tenant's subscription plan - check subscriptions table first (source of truth)
       const { data: tenant } = await supabase
         .from("tenants")
         .select("subscription_plan")
         .eq("id", agent.tenant_id)
         .single();
       
-      const planId = tenant?.subscription_plan || "free";
+      // Check subscriptions table for active subscription (source of truth for paid plans)
+      const { data: subscriptions } = await supabase
+        .from("subscriptions")
+        .select("plan_id, status")
+        .eq("tenant_id", agent.tenant_id)
+        .eq("status", "active")
+        .order("created_at", { ascending: false })
+        .limit(1);
+      
+      const subscription = subscriptions?.[0];
+      
+      // Use subscription plan_id if available, fallback to tenants.subscription_plan
+      const planId = subscription?.plan_id || tenant?.subscription_plan || "free";
+      
+      console.log(`[EXECUTE] Tenant plan detected: ${planId} (from ${subscription?.plan_id ? 'subscriptions' : 'tenants'} table)`);
       
       // First, validate subscription (checks for expired/canceled/past_due)
       const subscriptionCheck = await validateSubscription(agent.tenant_id);
@@ -183,11 +197,7 @@ export async function executeAgent(
     // 2. Build context (conversation history, knowledge base)
     const context = await buildContext(agent, input);
 
-    // 3. Load integration instances for this agent
-    // This is needed for both tool execution and legacy actions
-    const integrationMap = await getIntegrationMap(agent.tenant_id, agent.id);
-
-    // 4. Build system prompt
+    // 3. Build system prompt
     const systemPrompt = buildSystemPrompt(
       agent.name,
       agent.config.instructions,
@@ -214,8 +224,12 @@ export async function executeAgent(
     // 6. Load tools for Business Assistants only (not Customer Assistants/widget)
     let availableTools = {};
     let toolCallResults: any[] = [];
+    let integrationMap: Map<string, any> = new Map();
     
     if (agent.type === 'business_assistant') {
+      // Only load integrations for Business Assistants
+      integrationMap = await getIntegrationMap(agent.tenant_id, agent.id);
+      
       const { createTools } = await import('./tools');
       
       // Create tools with context injected via closure
@@ -438,11 +452,18 @@ function selectAIModel(modelName: string) {
     });
 
     const modelMap: Record<string, string> = {
-      // Gemini 3 (Latest)
+      // Gemini 3 Pro (preview - may require paid API)
       "gemini-3-pro": "gemini-3-pro-preview",
       "gemini-3-pro-preview": "gemini-3-pro-preview",
-      // Gemini 2.0
-      "gemini-2.0-flash": "gemini-2.0-flash-exp",
+      // Gemini 2.5 Pro  
+      "gemini-2.5-pro": "gemini-2.5-pro",
+      // Gemini 2.5 Flash (speed + cost efficient)
+      "gemini-2.5-flash": "gemini-2.5-flash",
+      // Gemini 2.5 Flash-Lite (fastest/cheapest)
+      "gemini-2.5-flash-lite": "gemini-2.5-flash-lite",
+      // Gemini 2.0 Flash (stable)
+      "gemini-2.0-flash": "gemini-2.0-flash",
+      "gemini-2.0-flash-exp": "gemini-2.0-flash-exp",
       "gemini-2.0-flash-thinking": "gemini-2.0-flash-thinking-exp",
       // Gemini 1.5
       "gemini-1.5-flash": "gemini-1.5-flash-latest",
@@ -452,7 +473,9 @@ function selectAIModel(modelName: string) {
       "gemini-pro": "gemini-1.5-pro-latest",
     };
 
-    const actualModel = modelMap[modelName] || "gemini-3-pro-preview";
+    // Use mapped model or fallback to stable gemini-2.0-flash
+    const actualModel = modelMap[modelName] || "gemini-2.0-flash";
+    console.log(`[MODEL] Requested: ${modelName} → Using: ${actualModel}`);
     return google(actualModel);
   } else if (modelName.includes("claude")) {
     const anthropic = createAnthropic({
@@ -492,6 +515,7 @@ function selectAIModel(modelName: string) {
 
 /**
  * Process agent actions based on response
+ * Note: This is primarily for email/sms trigger-based agents, not widget chat
  */
 async function processAgentActions(
   agent: any,
@@ -500,13 +524,18 @@ async function processAgentActions(
 ): Promise<any[]> {
   const actions: any[] = [];
 
+  // Skip integration loading for widget chat - Customer Assistants don't use integrations
+  if (input.type === "chat") {
+    return actions;
+  }
+
   try {
     // Get integration instances with credentials loaded from database
-    // Pass agent.id to filter by agent's allowed integrations
+    // Only needed for email/sms triggered agents
     const integrationMap = await getIntegrationMap(agent.tenant_id, agent.id);
 
     console.log(
-      `🔌 Available integrations for tenant: ${Array.from(integrationMap.keys()).join(", ")}`
+      `🔌 Available integrations for triggered agent: ${Array.from(integrationMap.keys()).join(", ")}`
     );
 
     // Example: Send email response if email integration is available
@@ -538,90 +567,8 @@ async function processAgentActions(
       }
     }
 
-    // Example: Create HubSpot contact if mentioned in chat
-    if (input.type === "chat" && response.toLowerCase().includes("contact")) {
-      if (integrationMap.has("hubspot")) {
-        const hubspotIntegration = integrationMap.get("hubspot");
-
-        // Extract contact info from the conversation (simplified)
-        const emailMatch = input.message?.match(/(\S+@\S+\.\S+)/);
-        const nameMatch = input.message?.match(/my name is (\w+)/i);
-
-        if (emailMatch && hubspotIntegration) {
-          const contactData = {
-            properties: {
-              email: emailMatch[1],
-              firstname: nameMatch?.[1] || "",
-              lastname: "",
-              phone: "",
-              company: "",
-            },
-          };
-
-          try {
-            const result = await hubspotIntegration.executeAction(
-              "create_contact",
-              contactData
-            );
-            actions.push({
-              type: "hubspot",
-              action: "create_contact",
-              result: { contactId: result.id, email: emailMatch[1] },
-              success: true,
-            });
-          } catch (error) {
-            actions.push({
-              type: "hubspot",
-              action: "create_contact",
-              error: "Failed to create contact",
-              success: false,
-            });
-          }
-        }
-      }
-    }
-
-    // Create deals for qualified leads
-    if (
-      input.type === "chat" &&
-      response.toLowerCase().includes("interested")
-    ) {
-      if (integrationMap.has("hubspot")) {
-        const hubspotIntegration = integrationMap.get("hubspot");
-
-        if (hubspotIntegration) {
-          try {
-            const dealData = {
-              properties: {
-                dealname: "New Lead from Chat",
-                amount: "1000",
-                dealstage: "appointmentscheduled",
-              },
-              amount: 1000,
-              stage: "appointmentscheduled",
-            };
-
-            const result = await hubspotIntegration.executeAction(
-              "create_deal",
-              dealData
-            );
-            actions.push({
-              type: "hubspot",
-              action: "create_deal",
-              result: { dealId: result.id, dealName: "New Lead from Chat" },
-              success: true,
-            });
-          } catch (error) {
-            actions.push({
-              type: "hubspot",
-              action: "create_deal",
-              error: "Failed to create deal",
-              success: false,
-            });
-          }
-        }
-      }
-    }
+    // Note: Chat-type inputs return early above since Customer Assistants don't use integrations
+    // The remaining code handles email/sms triggered agents only
   } catch (error) {
     console.error("Error processing agent actions:", error);
   }

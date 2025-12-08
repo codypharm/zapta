@@ -21,11 +21,12 @@ const plans = [
     features: [
       '1 AI agent',
       '100 messages/month',
-      'Gemini Flash model only',
+      'Gemini 2.0/1.5 Flash models',
       'Email integration (10/mo)',
       '10 MB storage',
       'Community support',
     ],
+    notIncluded: ['GPT models', 'Claude', 'SMS', 'Calendar', 'Google Drive', 'Notion', 'HubSpot', 'Stripe', 'Slack'],
     cta: 'Get Started',
     href: '/signup',
   },
@@ -37,12 +38,14 @@ const plans = [
     features: [
       '3 AI agents',
       '1,000 messages/month',
-      'Gemini + GPT-3.5 models',
-      'Email + SMS + Calendar',
-      '100 emails, 20 SMS/mo',
+      'Everything in Free, plus:',
+      'Gemini 2.5 Flash + GPT-3.5 + Claude Haiku',
+      'SMS integration (20/mo)',
+      'Google Calendar',
       '100 MB storage',
       'Email support',
     ],
+    notIncluded: ['GPT-4/Claude Sonnet', 'Google Drive', 'Notion', 'HubSpot', 'Stripe', 'Slack'],
     cta: 'Get Started',
     href: '/signup?plan=starter',
   },
@@ -55,12 +58,15 @@ const plans = [
     features: [
       '10 AI agents',
       '5,000 messages/month',
-      'All models inc. GPT-4.5',
-      'Starter + HubSpot + Webhooks',
-      '500 emails, 100 SMS/mo',
+      'Everything in Starter, plus:',
+      'Gemini 2.5 Pro + GPT-4o + Claude Sonnet',
+      'Google Drive, Docs & Sheets',
+      'Notion integration',
       '1 GB storage',
+
       'Priority support',
     ],
+    notIncluded: ['GPT-4.5/5', 'Gemini 3', 'HubSpot', 'Webhooks', 'Stripe', 'Slack'],
     cta: 'Get Started',
     href: '/signup?plan=pro',
   },
@@ -72,12 +78,16 @@ const plans = [
     features: [
       '50 AI agents',
       '25,000 messages/month',
-      'All models + GPT-5 access',
-      'Pro integrations + Advanced webhooks',
-      '2,000 emails, 500 SMS/mo',
+      'Everything in Pro, plus:',
+      'GPT-4.5, GPT-5 & Gemini 3 Pro',
+      'HubSpot CRM integration',
+      'Custom webhooks',
+      'Stripe payments',
       '5 GB storage',
+
       'Priority email support',
     ],
+    notIncluded: ['Slack'],
     cta: 'Get Started',
     href: '/signup?plan=business',
   },
@@ -89,10 +99,12 @@ const plans = [
     features: [
       'Unlimited AI agents',
       '100,000 messages/month',
-      'All models inc. GPT-5 + Custom fine-tuning',
-      'All integrations + Custom development',
+      'All models + Custom fine-tuning',
+      'Everything in Business, plus:',
+      'Slack integration',
       'Unlimited emails & SMS',
       '50 GB storage',
+
       '99.9% SLA guarantee',
       'Dedicated support manager',
     ],
@@ -100,6 +112,7 @@ const plans = [
     href: '/contact',
   },
 ];
+
 
 export default async function PricingPage() {
   // Check if user is authenticated
@@ -158,6 +171,12 @@ export default async function PricingPage() {
                       <li key={i} className="flex items-start gap-2 text-xs sm:text-sm">
                         <Check className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-primary mt-0.5 shrink-0" />
                         <span>{feature}</span>
+                      </li>
+                    ))}
+                    {plan.notIncluded && plan.notIncluded.map((feature, i) => (
+                      <li key={`not-${i}`} className="flex items-start gap-2 text-xs sm:text-sm text-muted-foreground">
+                        <X className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-muted-foreground/50 mt-0.5 shrink-0" />
+                        <span className="line-through">{feature}</span>
                       </li>
                     ))}
                   </ul>
