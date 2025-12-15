@@ -11,6 +11,7 @@ import { ArrowLeft, Edit, Code2, FileText, MessageSquare } from "lucide-react";
 import Link from "next/link";
 import { AgentChat } from "@/components/agents/agent-chat";
 import { KnowledgeBasePrompt } from "@/components/agents/knowledge-base-prompt";
+import { DeleteAgentButton } from "@/components/agents/delete-agent-button";
 
 export default async function AgentDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -103,6 +104,7 @@ export default async function AgentDetailPage({ params }: { params: Promise<{ id
                   <span className="hidden sm:inline">Edit</span>
                 </Link>
               </Button>
+              <DeleteAgentButton agentId={agent.id} agentName={agent.name} />
             </div>
           </div>
         </div>
