@@ -56,8 +56,8 @@ export function DeleteAgentButton({ agentId, agentName, variant = "button" }: De
             <Trash2 className="w-4 h-4" />
           </Button>
         ) : (
-          <Button variant="destructive" size="sm">
-            <Trash2 className="w-4 h-4 sm:mr-2" />
+          <Button variant="destructive" size="sm" className="gap-2">
+            <Trash2 className="w-4 h-4" />
             <span className="hidden sm:inline">Delete</span>
           </Button>
         )}

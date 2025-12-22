@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { Slot } from "@radix-ui/react-slot";
 import { cn } from "@/lib/utils";
 
 // Simple button variants function to avoid circular dependency
@@ -45,13 +46,16 @@ const AlertDialog = ({
 const AlertDialogTrigger = React.forwardRef<
   HTMLButtonElement,
   React.ButtonHTMLAttributes<HTMLButtonElement> & { asChild?: boolean }
->(({ className, ...props }, ref) => (
-  <button
-    className={cn(buttonVariants({ variant: "default" }), className)}
-    ref={ref}
-    {...props}
-  />
-));
+>(({ className, asChild = false, ...props }, ref) => {
+  const Comp = asChild ? Slot : "button";
+  return (
+    <Comp
+      className={asChild ? className : cn(buttonVariants({ variant: "default" }), className)}
+      ref={ref}
+      {...props}
+    />
+  );
+});
 AlertDialogTrigger.displayName = "AlertDialogTrigger";
 
 const AlertDialogContent = React.forwardRef<
